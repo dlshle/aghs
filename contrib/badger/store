@@ -1,3 +1,4 @@
+/*
 package badger
 
 import (
@@ -215,3 +216,4 @@ func (s BadgerStore) deserializeKV(rawKey []byte, rawValue []byte) (key, value i
 	})
 	return
 }
+*/
