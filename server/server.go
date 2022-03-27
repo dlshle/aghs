@@ -13,7 +13,12 @@ import (
 	"github.com/valyala/fasthttp/fasthttpadaptor"
 )
 
-type Server struct {
+type Server interface {
+	Start() error
+}
+
+type HTTPServer struct {
+	addr                  string
 	uriTrie               *uri_trie.TrieTree // trie of <routePattern, RequestHandler>
 	services              map[string]Service
 	middlewareManager     MiddlewareManager
@@ -21,31 +26,32 @@ type Server struct {
 	attachContextForError bool
 }
 
-func New() Server {
-	return Server{
+func New(addr string) HTTPServer {
+	return HTTPServer{
+		addr:                  addr,
 		uriTrie:               uri_trie.NewTrieTree(),
 		services:              make(map[string]Service),
 		middlewareManager:     NewMiddlewareManager(),
-		logger:                logger.NewLevelLogger(os.Stdout, "[Server]", log.Ldate|log.Ltime, logger.TRACE),
+		logger:                logger.NewLevelLogger(os.Stdout, "[HTTPServer]", log.Ldate|log.Ltime, logger.TRACE),
 		attachContextForError: false,
 	}
 }
 
-func (s Server) ShouldAttachContextOnServiceError(attach bool) {
+func (s HTTPServer) ShouldAttachContextOnServiceError(attach bool) {
 	s.attachContextForError = attach
 }
 
-func (s Server) Use(middleware Middleware) {
+func (s HTTPServer) Use(middleware Middleware) {
 	s.middlewareManager.RegisterMiddleware(middleware)
 }
 
-func (s Server) UseMiddlewares(middlewares ...Middleware) {
+func (s HTTPServer) UseMiddlewares(middlewares ...Middleware) {
 	for _, m := range middlewares {
 		s.middlewareManager.RegisterMiddleware(m)
 	}
 }
 
-func (s Server) RegisterService(service Service) error {
+func (s HTTPServer) RegisterService(service Service) error {
 	if _, exists := s.services[service.Id()]; exists {
 		return fmt.Errorf("service %s already exists", service.Id())
 	}
@@ -61,25 +67,25 @@ func (s Server) RegisterService(service Service) error {
 	return nil
 }
 
-func (s Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+func (s HTTPServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	err := s.HandleHTTP(w, req)
 	if err != nil {
 		s.logger.Errorf("server encountered an error while handling request(%s, %s) from %s due to %s", req.Method, req.URL.Path, req.RemoteAddr, err.Error())
 	}
 }
 
-func (s Server) HandleHTTP(w http.ResponseWriter, req *http.Request) (err error) {
+func (s HTTPServer) HandleHTTP(w http.ResponseWriter, req *http.Request) (err error) {
 	defer func() {
 		// in case of any panic
 		if recoveredPanic := recover(); recoveredPanic != nil {
 			err = fmt.Errorf("%v", recoveredPanic)
-			s.respondWithError(w, InternalError(err.Error()), nil)
+			s.respondWithError(w, InternalError(err.Error()), nil, nil)
 		}
 	}()
 	uri := req.RequestURI
 	matchCtx, err := s.uriTrie.Match(uri)
 	if err != nil {
-		return s.respondWithError(w, NotFoundError(fmt.Sprintf("route %s is undefined", uri)), nil)
+		return s.respondWithError(w, NotFoundError(fmt.Sprintf("route %s is undefined", uri)), nil, nil)
 	}
 	request := s.buildRequest(req, matchCtx)
 	traceId := request.Id()
@@ -87,34 +93,39 @@ func (s Server) HandleHTTP(w http.ResponseWriter, req *http.Request) (err error)
 	middlewareCtx := s.middlewareManager.Run(request, matchCtx.Value.(Service).Handle)
 	resp, serviceErr := middlewareCtx.Response(), middlewareCtx.Error()
 	if serviceErr != nil {
-		return s.respondWithError(w, serviceErr, request.Context())
+		return s.respondWithError(w, serviceErr, resp, request.Context())
 	}
 	// service handler(core handler) will set middleware.Ctx.response to nil when it doesn't have proper handler operation?
 	if resp == nil {
-		return s.respondWithError(w, InternalError("invalid handler operation"), request.Context())
+		return s.respondWithError(w, InternalError("invalid handler operation"), resp, request.Context())
 	}
 	err = s.respondWithServiceResponse(w, resp)
 	if err != nil {
-		return s.respondWithError(w, InternalError(err.Error()), request.Context())
+		return s.respondWithError(w, InternalError(err.Error()), resp, request.Context())
 	}
 	return err
 }
 
-func (s Server) buildRequest(r *http.Request, matchCtx *uri_trie.MatchContext) Request {
+func (s HTTPServer) buildRequest(r *http.Request, matchCtx *uri_trie.MatchContext) Request {
 	return NewRequest(r, matchCtx.UriPattern, matchCtx.QueryParams, matchCtx.PathParams)
 }
 
-func (s Server) respondWithError(w http.ResponseWriter, serviceErr ServiceError, requestCtx RequestContext) (err error) {
+func (s HTTPServer) respondWithError(w http.ResponseWriter, serviceErr ServiceError, resp *Response, requestCtx RequestContext) (err error) {
 	if s.attachContextForError {
 		serviceErr.AttachContext(requestCtx)
 	}
 	w.Header().Set("Content-Type", serviceErr.ContentType())
 	w.WriteHeader(serviceErr.Code())
+	if resp != nil {
+		resp.IterateHeaders(func(k, v string) {
+			w.Header().Set(k, v)
+		})
+	}
 	_, err = w.Write([]byte(serviceErr.Error()))
 	return
 }
 
-func (s Server) respondWithServiceResponse(w http.ResponseWriter, r *Response) (err error) {
+func (s HTTPServer) respondWithServiceResponse(w http.ResponseWriter, r *Response) (err error) {
 	if r.Code() == 0 {
 		return fmt.Errorf("invalid payload")
 	}
@@ -131,17 +142,13 @@ func (s Server) respondWithServiceResponse(w http.ResponseWriter, r *Response) (
 	return
 }
 
-func (s Server) Start(addr string) error {
+func (s HTTPServer) Start() error {
+	addr := s.addr
 	s.logger.Infof("starting the server on %s with TCP protocol...", addr)
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		s.logger.Errorf("error starting server at addr %s: %s", addr, err.Error())
 		return err
 	}
-	err = fasthttp.Serve(listener, fasthttpadaptor.NewFastHTTPHandler(s))
-	if err != nil {
-		return err
-	}
-	s.logger.Info("server has started on ", addr)
-	return nil
+	return fasthttp.Serve(listener, fasthttpadaptor.NewFastHTTPHandler(s))
 }
