@@ -3,8 +3,9 @@ package uri_trie
 import (
 	"errors"
 	"fmt"
-	"github.com/dlshle/aghs/utils"
 	"strings"
+
+	"github.com/dlshle/aghs/utils"
 )
 
 const (
@@ -30,15 +31,36 @@ func parseQueryParams(queryParamString string) (pMap map[string]string, err erro
 	}
 	exps := strings.Split(queryParamString, "&")
 	for _, exp := range exps {
-		split := strings.Split(exp, "=")
-		if len(split) != 2 {
-			err = errors.New("invalid expression " + exp)
+		var (
+			key string
+			val string
+		)
+		key, val, err = getSplittedQueryParamStrings(exp)
+		if err != nil {
 			pMap = nil
 			return
 		}
-		pMap[split[0]] = split[1]
+		pMap[key] = val
 	}
 	return
+}
+
+func getSplittedQueryParamStrings(queryParam string) (string, string, error) {
+	l := len(queryParam)
+	if l < 3 {
+		return "", "", fmt.Errorf("invalid query param(%s) length %d", queryParam, l)
+	}
+	eqIndx := 0
+	for i, c := range queryParam {
+		if c == '=' {
+			eqIndx = i
+			break
+		}
+	}
+	if eqIndx >= l-1 {
+		return "", "", fmt.Errorf("invalid equal sign query param syntax %s", queryParam)
+	}
+	return queryParam[:eqIndx], queryParam[eqIndx+1:], nil
 }
 
 func splitRemaining(remaining string) (string, string) {
