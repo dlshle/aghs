@@ -11,6 +11,7 @@ import (
 type ServiceError interface {
 	Error() string
 	Code() int
+	ContentType() string
 	AttachContext(ctx RequestContext)
 }
 
@@ -24,6 +25,7 @@ func NewServiceError(code int, msg string) *serviceError {
 	if code < 400 || code > 600 {
 		code = 500
 	}
+	msg = strings.TrimSpace(msg)
 	return &serviceError{code, msg, nil}
 }
 
@@ -52,6 +54,13 @@ func (e *serviceError) errorWithContext() string {
 	}
 	builder.WriteByte('}')
 	return builder.String()
+}
+
+func (e *serviceError) ContentType() string {
+	if len(e.msg) > 0 && e.msg[0] == '{' {
+		return "application/json; charset=UTF-8"
+	}
+	return "text/plain"
 }
 
 func (e *serviceError) Code() int {
