@@ -20,6 +20,9 @@ func (c *middlewareContext) Request() Request {
 }
 
 func (c *middlewareContext) Response() *Response {
+	if c.response == nil {
+		c.response = NewResponse(-1, nil)
+	}
 	return c.response
 }
 
