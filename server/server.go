@@ -108,7 +108,7 @@ func (s Server) respondWithError(w http.ResponseWriter, serviceErr ServiceError,
 	if s.attachContextForError {
 		serviceErr.AttachContext(requestCtx)
 	}
-	// w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(serviceErr.Code())
 	_, err = w.Write([]byte(serviceErr.Error()))
 	return
