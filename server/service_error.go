@@ -31,7 +31,7 @@ func (e *serviceError) Error() string {
 	if e.ctx != nil {
 		return e.errorWithContext()
 	}
-	return utils.EncodeString(e.msg)
+	return e.msg
 }
 
 func (e *serviceError) errorWithContext() string {

@@ -3,6 +3,7 @@ package example
 import (
 	"encoding/json"
 	"fmt"
+
 	"github.com/dlshle/aghs/server"
 	"github.com/dlshle/aghs/store"
 )

@@ -3,10 +3,11 @@ package example
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/dlshle/aghs/server"
-	"github.com/dlshle/aghs/utils"
 	"sync"
 	"time"
+
+	"github.com/dlshle/aghs/server"
+	"github.com/dlshle/aghs/utils"
 )
 
 const AUTH_HEADER = "Authorization"

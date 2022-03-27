@@ -20,11 +20,11 @@ type Request struct {
 	c  RequestContext
 }
 
-func NewRequest(r *http.Request, uri_pattern string, query_params map[string]string, path_params map[string]string) Request {
+func NewRequest(r *http.Request, uriPattern string, queryParams map[string]string, pathParams map[string]string) Request {
 	c := make(RequestContext)
-	c.RegisterContext(ContextKeyUriPattern, uri_pattern)
-	c.RegisterContext(ContextKeyQueryParams, query_params)
-	c.RegisterContext(ContextKeyPathParams, path_params)
+	c.RegisterContext(ContextKeyUriPattern, uriPattern)
+	c.RegisterContext(ContextKeyQueryParams, queryParams)
+	c.RegisterContext(ContextKeyPathParams, pathParams)
 	return Request{
 		id: utils.GenerateId(),
 		r:  r,

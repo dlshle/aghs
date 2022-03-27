@@ -76,10 +76,10 @@ func (s Server) HandleHTTP(w http.ResponseWriter, req *http.Request) (err error)
 			s.respondWithError(w, InternalError(err.Error()), nil)
 		}
 	}()
-	path := req.URL.Path
-	matchCtx, err := s.uriTrie.Match(path)
+	uri := req.RequestURI
+	matchCtx, err := s.uriTrie.Match(uri)
 	if err != nil {
-		return s.respondWithError(w, NotFoundError(fmt.Sprintf("route %s is undefined", path)), nil)
+		return s.respondWithError(w, NotFoundError(fmt.Sprintf("route %s is undefined", uri)), nil)
 	}
 	request := s.buildRequest(req, matchCtx)
 	traceId := request.Id()
