@@ -31,7 +31,7 @@ func EncodeString(original string) string {
 	return strings.ReplaceAll(original, "\"", "\\\"")
 }
 
-func GenerateId() string {
+func GenerateID() string {
 	return strconv.FormatInt(randomGenerator.Int63n(time.Now().Unix()), 16)
 }
 

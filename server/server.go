@@ -8,7 +8,7 @@ import (
 	"os"
 
 	"github.com/dlshle/aghs/logger"
-	"github.com/dlshle/aghs/uri_trie"
+	"github.com/dlshle/gommon/uri_trie"
 	"github.com/valyala/fasthttp"
 	"github.com/valyala/fasthttp/fasthttpadaptor"
 )
@@ -88,8 +88,8 @@ func (s HTTPServer) HandleHTTP(w http.ResponseWriter, req *http.Request) (err er
 		return s.respondWithError(w, NotFoundError(fmt.Sprintf("route %s is undefined", uri)), nil, nil)
 	}
 	request := s.buildRequest(req, matchCtx)
-	traceId := request.Id()
-	s.logger.Infof("[%s] receive request %s", traceId, request.String())
+	traceID := request.Id()
+	s.logger.Infof("[%s] receive request %s", traceID, request.String())
 	middlewareCtx := s.middlewareManager.Run(request, matchCtx.Value.(Service).Handle)
 	resp, serviceErr := middlewareCtx.Response(), middlewareCtx.Error()
 	if serviceErr != nil {

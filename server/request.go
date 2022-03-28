@@ -26,7 +26,7 @@ func NewRequest(r *http.Request, uriPattern string, queryParams map[string]strin
 	c.RegisterContext(ContextKeyQueryParams, queryParams)
 	c.RegisterContext(ContextKeyPathParams, pathParams)
 	return Request{
-		id: utils.GenerateId(),
+		id: utils.GenerateID(),
 		r:  r,
 		c:  c,
 	}
