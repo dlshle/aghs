@@ -1,6 +1,7 @@
-package example
+package main
 
 import (
+	"github.com/dlshle/aghs/contrib/middlewares"
 	"github.com/dlshle/aghs/server"
 	"strconv"
 	"sync/atomic"
@@ -11,6 +12,7 @@ func main() {
 	httpServer, err := server.NewBuilder().
 		Address("0.0.0.0:1234").
 		WithService(NewStudentService()).
+		WithMiddleware(middlewares.CORSAllowWildcardMiddleware).
 		WithMiddleware(func(ctx server.MiddlewareContext) {
 			atomic.AddUint32(&requestCounter, 1)
 			defer func() {
