@@ -3,9 +3,9 @@ package server
 import (
 	"fmt"
 	"github.com/dlshle/aghs/logger"
+	"io"
 	"log"
 	"os"
-	"sync"
 )
 
 type Service interface {
@@ -17,104 +17,14 @@ type Service interface {
 	Logger() logger.Logger
 }
 
-type MutableService interface {
-	Service
-	RegisterHandlersByPath(routePattern string, handlers map[string]RequestHandler) (err error)
-	RegisterHandler(method, routePattern string, handler RequestHandler) (err error)
-	UnRegisterHandler(method, routePattern string) (err error)
-	Use(middleware Middleware)
-}
-
-type service struct {
+type immutableService struct {
 	id          string
-	uriMap      map[string]map[string][]Middleware
-	lock        *sync.RWMutex
+	uriMap      map[string]map[string]RequestHandler
 	logger      logger.Logger
 	middlewares []Middleware
 }
 
-func NewService(id string) MutableService {
-	return service{
-		id:          id,
-		uriMap:      make(map[string]map[string][]Middleware),
-		lock:        new(sync.RWMutex),
-		middlewares: make([]Middleware, 0),
-		logger:      logger.NewLevelLogger(os.Stdout, fmt.Sprintf("[service-%s]", id), log.Ldate|log.Ltime, logger.TRACE),
-	}
-}
-
-func (s service) withWrite(cb func()) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	cb()
-}
-
-func (s service) Id() string {
-	return s.id
-}
-
-func (s service) RegisterHandlersByPath(routePattern string, handlers map[string]RequestHandler) (err error) {
-	for k, v := range handlers {
-		if err = s.RegisterHandler(k, routePattern, v); err != nil {
-			return
-		}
-	}
-	return
-}
-
-// this overrides the previous handler at [route][method]
-func (s service) RegisterHandler(method, routePattern string, handler RequestHandler) (err error) {
-	if handler == nil {
-		return fmt.Errorf("invalid handler")
-	}
-	s.withWrite(func() {
-		if s.uriMap[routePattern] == nil {
-			s.uriMap[routePattern] = make(map[string][]Middleware)
-		}
-		if s.uriMap[routePattern][method] == nil {
-			s.uriMap[routePattern][method] = []Middleware{wrapHandlerAsMiddleware(handler)}
-		}
-	})
-	s.logger.Infof("handler (%s, %s) has been registered", method, routePattern)
-	return
-}
-
-// don't think this is necessary though
-func (s service) UnRegisterHandler(method, routePattern string) (err error) {
-	s.withWrite(func() {
-		if s.uriMap[routePattern] == nil {
-			err = s.notFoundError("routePattern", routePattern)
-			return
-		}
-		if s.uriMap[routePattern][method] == nil {
-			err = s.methodNotFoundError(method, routePattern)
-			return
-		}
-		delete(s.uriMap[routePattern], method)
-		if len(s.uriMap[routePattern]) == 0 {
-			delete(s.uriMap, routePattern)
-		}
-	})
-	return
-}
-
-func (s service) UriPatterns() []string {
-	var patterns []string
-	for pattern, _ := range s.uriMap {
-		patterns = append(patterns, pattern)
-	}
-	return patterns
-}
-
-func (s service) SupportsRoutePattern(routePattern string) bool {
-	return s.uriMap[routePattern] != nil
-}
-
-func (s service) SupportsMethodForPattern(routePattern, method string) bool {
-	return s.SupportsRoutePattern(routePattern) && s.uriMap[routePattern][method] != nil
-}
-
-func (s service) getRequestHandlingMiddlewares(routePattern, method string) []Middleware {
+func (s immutableService) getRequestHandlingMiddlewares(routePattern, method string) RequestHandler {
 	methodMap := s.uriMap[routePattern]
 	if methodMap != nil {
 		return methodMap[method]
@@ -122,29 +32,142 @@ func (s service) getRequestHandlingMiddlewares(routePattern, method string) []Mi
 	return nil
 }
 
-func (s service) Handle(request Request) (resp *Response, err ServiceError) {
-	middlewares := s.getRequestHandlingMiddlewares(request.UriPattern(), request.Method())
-	if middlewares == nil {
+func (s immutableService) Handle(request Request) (resp *Response, err ServiceError) {
+	handler := s.getRequestHandlingMiddlewares(request.UriPattern(), request.Method())
+	if handler == nil {
 		err = MethodNotAllowedError(fmt.Sprintf("method %s is not allowed for uri pattern %s", request.Method(), request.UriPattern()))
 		return
 	}
-	return runMiddlewares(middlewares, request)
+	return handler(request)
 }
 
-func (s service) Use(middleware Middleware) {
-	s.withWrite(func() {
-		s.middlewares = append(s.middlewares, middleware)
-	})
+func (s immutableService) UriPatterns() []string {
+	var patterns []string
+	for pattern, _ := range s.uriMap {
+		patterns = append(patterns, pattern)
+	}
+	return patterns
 }
 
-func (s service) Logger() logger.Logger {
+func (s immutableService) Id() string {
+	return s.id
+}
+
+func (s immutableService) SupportsRoutePattern(routePattern string) bool {
+	return s.uriMap[routePattern] != nil
+}
+
+func (s immutableService) SupportsMethodForPattern(routePattern, method string) bool {
+	return s.SupportsRoutePattern(routePattern) && s.uriMap[routePattern][method] != nil
+}
+
+func (s immutableService) Logger() logger.Logger {
 	return s.logger
 }
 
-func (s service) methodNotFoundError(method, routePattern string) error {
-	return fmt.Errorf("method %s for routePattern %s does not exist", method, routePattern)
+type ServiceBuilder interface {
+	Id(string) ServiceBuilder
+	Middlewares(...Middleware) ServiceBuilder
+	WithRouteHandlers(path HandlersWithPath) ServiceBuilder
+	LogWriter(io.Writer) ServiceBuilder
+	Build() (Service, error)
 }
 
-func (s service) notFoundError(itemType, item string) error {
-	return fmt.Errorf("%s %s does not exist", itemType, item)
+type immutableServiceBuilder struct {
+	s           *immutableService
+	uriMap      map[string]map[string][]Middleware
+	middlewares []Middleware
+	err         error
+	writer      io.Writer
+}
+
+func NewServiceBuilder() ServiceBuilder {
+	return &immutableServiceBuilder{
+		s: &immutableService{
+			uriMap:      make(map[string]map[string]RequestHandler),
+			middlewares: make([]Middleware, 0),
+		},
+		uriMap:      make(map[string]map[string][]Middleware),
+		middlewares: make([]Middleware, 0),
+		err:         nil,
+		writer:      nil,
+	}
+}
+
+func (b *immutableServiceBuilder) Middlewares(middlewares ...Middleware) ServiceBuilder {
+	if b.err != nil {
+		return b
+	}
+	b.middlewares = middlewares
+	return b
+}
+
+func (b *immutableServiceBuilder) WithRouteHandlers(handlersWithPath HandlersWithPath) ServiceBuilder {
+	if b.err != nil {
+		return b
+	}
+	path := handlersWithPath.Path()
+	handlers := handlersWithPath.Handlers()
+	if b.uriMap[path] != nil {
+		b.err = fmt.Errorf("path %s has already been registered", path)
+		return b
+	}
+	b.uriMap[path] = handlers
+	return b
+}
+
+func (b *immutableServiceBuilder) Build() (Service, error) {
+	if b.err != nil {
+		return nil, b.err
+	}
+	if b.s.id == "" {
+		return nil, fmt.Errorf("service id is empty")
+	}
+	if len(b.uriMap) == 0 {
+		return nil, fmt.Errorf("service has empty handler map")
+	}
+	b.tryConcatServiceMiddlewaresToRequestHandlerMiddlewares()
+	b.compressRequestHandlerMiddlewares()
+	return b.s, nil
+}
+
+func (b *immutableServiceBuilder) tryConcatServiceMiddlewaresToRequestHandlerMiddlewares() {
+	if b.middlewares == nil {
+		return
+	}
+	for u, v := range b.uriMap {
+		for k, m := range v {
+			b.uriMap[u][k] = append(b.middlewares, m...)
+		}
+	}
+}
+
+func (b *immutableServiceBuilder) compressRequestHandlerMiddlewares() {
+	for u, v := range b.uriMap {
+		requestHandlerMap := make(map[string]RequestHandler)
+		for k, m := range v {
+			requestHandlerMap[k] = middlewaresToRequestHandler(m)
+		}
+		b.s.uriMap[u] = requestHandlerMap
+	}
+}
+
+func (b *immutableServiceBuilder) Id(id string) ServiceBuilder {
+	b.s.id = id
+	var writer io.Writer
+	if b.writer != nil {
+		writer = b.writer
+	} else {
+		writer = os.Stdout
+	}
+	b.s.logger = logger.NewLevelLogger(writer, fmt.Sprintf("[service-%s]", id), log.Ldate|log.Ltime, logger.TRACE)
+	return b
+}
+
+func (b *immutableServiceBuilder) LogWriter(writer io.Writer) ServiceBuilder {
+	if b.s.id != "" {
+		b.s.logger = logger.NewLevelLogger(writer, fmt.Sprintf("[service-%s]", b.s.id), log.Ldate|log.Ltime, logger.TRACE)
+	}
+	b.writer = writer
+	return b
 }

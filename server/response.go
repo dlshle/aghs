@@ -56,13 +56,14 @@ func (r *Response) IterateHeaders(cb func(k, v string)) {
 }
 
 func (r *Response) PayloadStream() (stream []byte, err error) {
+	if r.payload == nil {
+		return nil, nil
+	}
 	switch r.payload.(type) {
 	case []byte:
 		stream = r.payload.([]byte)
-		break
 	case string:
 		stream = []byte(r.payload.(string))
-		break
 	default:
 		if transformed, ok := r.payload.(utils.Stringify); ok {
 			stream = []byte(transformed.String())

@@ -2,79 +2,36 @@ package server
 
 import (
 	"fmt"
-	"log"
-	"net"
-	"net/http"
-	"os"
-
 	"github.com/dlshle/aghs/logger"
 	"github.com/dlshle/gommon/uri_trie"
 	"github.com/valyala/fasthttp"
 	"github.com/valyala/fasthttp/fasthttpadaptor"
+	"log"
+	"net"
+	"net/http"
+	"os"
 )
 
 type Server interface {
 	Start() error
 }
 
-type HTTPServer struct {
+type immutableServer struct {
 	addr                  string
-	uriTrie               *uri_trie.TrieTree // trie of <routePattern, RequestHandler>
-	services              map[string]Service
-	middlewareManager     MiddlewareManager
+	uriTrie               *uri_trie.TrieTree
+	middlewares           []Middleware
 	logger                logger.Logger
 	attachContextForError bool
 }
 
-func New(addr string) HTTPServer {
-	return HTTPServer{
-		addr:                  addr,
-		uriTrie:               uri_trie.NewTrieTree(),
-		services:              make(map[string]Service),
-		middlewareManager:     NewMiddlewareManager(),
-		logger:                logger.NewLevelLogger(os.Stdout, "[HTTPServer]", log.Ldate|log.Ltime, logger.TRACE),
-		attachContextForError: false,
-	}
-}
-
-func (s HTTPServer) ShouldAttachContextOnServiceError(attach bool) {
-	s.attachContextForError = attach
-}
-
-func (s HTTPServer) Use(middleware Middleware) {
-	s.middlewareManager.RegisterMiddleware(middleware)
-}
-
-func (s HTTPServer) UseMiddlewares(middlewares ...Middleware) {
-	for _, m := range middlewares {
-		s.middlewareManager.RegisterMiddleware(m)
-	}
-}
-
-func (s HTTPServer) RegisterService(service Service) error {
-	if _, exists := s.services[service.Id()]; exists {
-		return fmt.Errorf("service %s already exists", service.Id())
-	}
-	s.services[service.Id()] = service
-	for _, pattern := range service.UriPatterns() {
-		err := s.uriTrie.Add(pattern, service, true)
-		if err != nil {
-			s.logger.Errorf("error while adding route %s from service %s: %s", pattern, service.Id(), err.Error())
-			return err
-		}
-	}
-	s.logger.Infof("service %s has been registered", service.Id())
-	return nil
-}
-
-func (s HTTPServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+func (s immutableServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	err := s.HandleHTTP(w, req)
 	if err != nil {
 		s.logger.Errorf("server encountered an error while handling request(%s, %s) from %s due to %s", req.Method, req.URL.Path, req.RemoteAddr, err.Error())
 	}
 }
 
-func (s HTTPServer) HandleHTTP(w http.ResponseWriter, req *http.Request) (err error) {
+func (s immutableServer) HandleHTTP(w http.ResponseWriter, req *http.Request) (err error) {
 	defer func() {
 		// in case of any panic
 		if recoveredPanic := recover(); recoveredPanic != nil {
@@ -90,8 +47,8 @@ func (s HTTPServer) HandleHTTP(w http.ResponseWriter, req *http.Request) (err er
 	request := s.buildRequest(req, matchCtx)
 	traceID := request.Id()
 	s.logger.Infof("[%s] receive request %s", traceID, request.String())
-	middlewareCtx := s.middlewareManager.Run(request, matchCtx.Value.(Service).Handle)
-	resp, serviceErr := middlewareCtx.Response(), middlewareCtx.Error()
+	middlewares := append(s.middlewares, wrapHandlerAsMiddleware(matchCtx.Value.(Service).Handle))
+	resp, serviceErr := runMiddlewares(middlewares, request)
 	if serviceErr != nil {
 		return s.respondWithError(w, serviceErr, resp, request.Context())
 	}
@@ -106,11 +63,11 @@ func (s HTTPServer) HandleHTTP(w http.ResponseWriter, req *http.Request) (err er
 	return err
 }
 
-func (s HTTPServer) buildRequest(r *http.Request, matchCtx *uri_trie.MatchContext) Request {
+func (s immutableServer) buildRequest(r *http.Request, matchCtx *uri_trie.MatchContext) Request {
 	return NewRequest(r, matchCtx.UriPattern, matchCtx.QueryParams, matchCtx.PathParams)
 }
 
-func (s HTTPServer) respondWithError(w http.ResponseWriter, serviceErr ServiceError, resp *Response, requestCtx RequestContext) (err error) {
+func (s immutableServer) respondWithError(w http.ResponseWriter, serviceErr ServiceError, resp *Response, requestCtx RequestContext) (err error) {
 	if s.attachContextForError {
 		serviceErr.AttachContext(requestCtx)
 	}
@@ -125,7 +82,7 @@ func (s HTTPServer) respondWithError(w http.ResponseWriter, serviceErr ServiceEr
 	return
 }
 
-func (s HTTPServer) respondWithServiceResponse(w http.ResponseWriter, r *Response) (err error) {
+func (s immutableServer) respondWithServiceResponse(w http.ResponseWriter, r *Response) (err error) {
 	if r.Code() == 0 {
 		return fmt.Errorf("invalid payload")
 	}
@@ -134,6 +91,9 @@ func (s HTTPServer) respondWithServiceResponse(w http.ResponseWriter, r *Respons
 	r.IterateHeaders(func(k string, v string) {
 		w.Header().Set(k, v)
 	})
+	if r.Code() == http.StatusNoContent {
+		return
+	}
 	stream, err := r.PayloadStream()
 	if err != nil {
 		return err
@@ -142,7 +102,7 @@ func (s HTTPServer) respondWithServiceResponse(w http.ResponseWriter, r *Respons
 	return
 }
 
-func (s HTTPServer) Start() error {
+func (s immutableServer) Start() error {
 	addr := s.addr
 	s.logger.Infof("starting the server on %s with TCP protocol...", addr)
 	listener, err := net.Listen("tcp", addr)
@@ -151,4 +111,103 @@ func (s HTTPServer) Start() error {
 		return err
 	}
 	return fasthttp.Serve(listener, fasthttpadaptor.NewFastHTTPHandler(s))
+}
+
+type Builder interface {
+	Address(string) Builder
+	WithServices([]Service) Builder
+	WithService(Service) Builder
+	WithMiddlewares([]Middleware) Builder
+	WithMiddleware(Middleware) Builder
+	Logger(logger.Logger) Builder
+	AttachContextForError(bool) Builder
+	Build() (Server, error)
+}
+
+type serverBuilder struct {
+	addr                  string
+	uriTrie               *uri_trie.TrieTree
+	middlewares           []Middleware
+	logger                logger.Logger
+	attachContextForError bool
+	serviceIdSet          map[string]bool
+	err                   error
+}
+
+func (s *serverBuilder) Address(addr string) Builder {
+	s.addr = addr
+	return s
+}
+
+func (s *serverBuilder) WithServices(services []Service) Builder {
+	for _, svc := range services {
+		if !s.addService(svc) {
+			return s
+		}
+	}
+	return s
+}
+
+func (s *serverBuilder) WithService(svc Service) Builder {
+	s.addService(svc)
+	return s
+}
+
+func (s *serverBuilder) WithMiddlewares(middlewares []Middleware) Builder {
+	s.middlewares = append(s.middlewares, middlewares...)
+	return s
+}
+
+func (s *serverBuilder) WithMiddleware(middleware Middleware) Builder {
+	s.middlewares = append(s.middlewares, middleware)
+	return s
+}
+
+func (s *serverBuilder) Logger(l logger.Logger) Builder {
+	s.logger = l
+	return s
+}
+
+func (s *serverBuilder) AttachContextForError(attach bool) Builder {
+	s.attachContextForError = attach
+	return s
+}
+
+func (s *serverBuilder) Build() (Server, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return immutableServer{
+		addr:                  s.addr,
+		uriTrie:               s.uriTrie,
+		middlewares:           s.middlewares,
+		logger:                s.logger,
+		attachContextForError: s.attachContextForError,
+	}, nil
+}
+
+func (s *serverBuilder) addService(service Service) bool {
+	if _, exists := s.serviceIdSet[service.Id()]; exists {
+		s.err = fmt.Errorf("service %s already exists", service.Id())
+		return false
+	}
+	s.serviceIdSet[service.Id()] = true
+	for _, pattern := range service.UriPatterns() {
+		err := s.uriTrie.Add(pattern, service, true)
+		if err != nil {
+			s.logger.Errorf("error while adding route %s from service %s: %s", pattern, service.Id(), err.Error())
+			s.err = err
+			return false
+		}
+	}
+	return true
+}
+
+func NewBuilder() Builder {
+	return &serverBuilder{
+		middlewares:  make([]Middleware, 0),
+		serviceIdSet: make(map[string]bool),
+		uriTrie:      uri_trie.NewTrieTree(),
+		logger:       logger.NewLevelLogger(os.Stdout, "[HTTPServer]", log.Ldate|log.Ltime, logger.TRACE),
+	}
 }
