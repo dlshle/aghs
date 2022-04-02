@@ -21,12 +21,16 @@ type serviceError struct {
 	ctx  RequestContext
 }
 
-func NewServiceError(code int, msg string) *serviceError {
+func NewServiceErrorWithCode(code int, msg string) *serviceError {
 	if code < 400 || code > 600 {
 		code = 500
 	}
 	msg = strings.TrimSpace(msg)
 	return &serviceError{code, msg, nil}
+}
+
+func NewServiceError(msg string) *serviceError {
+	return NewServiceErrorWithCode(http.StatusInternalServerError, msg)
 }
 
 func (e *serviceError) Error() string {
@@ -72,21 +76,21 @@ func (e *serviceError) AttachContext(ctx RequestContext) {
 }
 
 func MethodNotAllowedError(msg string) *serviceError {
-	return NewServiceError(http.StatusMethodNotAllowed, msg)
+	return NewServiceErrorWithCode(http.StatusMethodNotAllowed, msg)
 }
 
 func NotFoundError(msg string) *serviceError {
-	return NewServiceError(http.StatusNotFound, msg)
+	return NewServiceErrorWithCode(http.StatusNotFound, msg)
 }
 
 func BadRequestError(msg string) *serviceError {
-	return NewServiceError(http.StatusBadRequest, msg)
+	return NewServiceErrorWithCode(http.StatusBadRequest, msg)
 }
 
 func InternalError(msg string) *serviceError {
-	return NewServiceError(http.StatusInternalServerError, msg)
+	return NewServiceErrorWithCode(http.StatusInternalServerError, msg)
 }
 
 func ForbiddenError(msg string) *serviceError {
-	return NewServiceError(http.StatusForbidden, msg)
+	return NewServiceErrorWithCode(http.StatusForbidden, msg)
 }

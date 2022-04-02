@@ -2,61 +2,75 @@ package server
 
 import (
 	"encoding/json"
-	"github.com/dlshle/aghs/utils"
+	"net/http"
+
+	"github.com/dlshle/gommon/stringz"
 )
 
-type Response struct {
+type Response interface {
+	Code() int
+	SetCode(code int)
+	Payload() interface{}
+	SetPayload(payload interface{})
+	SetHeader(key string, value string)
+	GetHeader(key string) (bool, string)
+	IterateHeaders(cb func(k, v string))
+	PayloadStream() (stream []byte, err error)
+	ContentType() string
+}
+
+type response struct {
 	code        int
 	payload     interface{}
 	contentType string
 	header      map[string]string
 }
 
-func NewResponse(code int, payload interface{}) *Response {
-	return &Response{code, payload, "application/json; charset=UTF-8", make(map[string]string)}
+func NewResponse(code int, payload interface{}) Response {
+	return &response{code, payload, "application/json; charset=UTF-8", make(map[string]string)}
 }
 
-func NewPlainTextResponse(code int, payload interface{}) *Response {
+func NewPlainTextResponse(code int, payload interface{}) Response {
 	return NewResponseWithContentType(code, payload, "text/plain")
 }
 
-func NewResponseWithContentType(code int, payload interface{}, contentType string) *Response {
-	return &Response{code, payload, contentType, make(map[string]string)}
+func NewResponseWithContentType(code int, payload interface{}, contentType string) Response {
+	return &response{code, payload, contentType, make(map[string]string)}
 }
 
-func (r *Response) Code() int {
+func (r *response) Code() int {
 	return r.code
 }
 
-func (r *Response) SetCode(code int) {
+func (r *response) SetCode(code int) {
 	r.code = code
 }
 
-func (r *Response) Payload() interface{} {
+func (r *response) Payload() interface{} {
 	return r.payload
 }
 
-func (r *Response) SetPayload(payload interface{}) {
+func (r *response) SetPayload(payload interface{}) {
 	r.payload = payload
 }
 
-func (r *Response) SetHeader(key string, value string) {
+func (r *response) SetHeader(key string, value string) {
 	r.header[key] = value
 }
 
-func (r *Response) GetHeader(key string) (bool, string) {
+func (r *response) GetHeader(key string) (bool, string) {
 	value, exists := r.header[key]
 	return exists, value
 }
 
-func (r *Response) IterateHeaders(cb func(k, v string)) {
+func (r *response) IterateHeaders(cb func(k, v string)) {
 	for k, v := range r.header {
 		cb(k, v)
 	}
 }
 
-func (r *Response) PayloadStream() (stream []byte, err error) {
-	if r.payload == nil {
+func (r *response) PayloadStream() (stream []byte, err error) {
+	if r.payload == nil || r.code == http.StatusNoContent {
 		return nil, nil
 	}
 	switch r.payload.(type) {
@@ -65,7 +79,7 @@ func (r *Response) PayloadStream() (stream []byte, err error) {
 	case string:
 		stream = []byte(r.payload.(string))
 	default:
-		if transformed, ok := r.payload.(utils.Stringify); ok {
+		if transformed, ok := r.payload.(stringz.Stringify); ok {
 			stream = []byte(transformed.String())
 		} else {
 			stream, err = json.Marshal(r.Payload())
@@ -74,6 +88,33 @@ func (r *Response) PayloadStream() (stream []byte, err error) {
 	return
 }
 
-func (r *Response) ContentType() string {
+func (r *response) SetContentType(contentType string) {
+	r.contentType = contentType
+}
+
+func (r *response) ContentType() string {
+	if r.payload == nil || r.code == http.StatusNoContent {
+		return ""
+	}
 	return r.contentType
+}
+
+func InternalServerErrorResponse(payload interface{}) Response {
+	return NewResponse(http.StatusInternalServerError, payload)
+}
+
+func MethodNotAllowedResponse(payload interface{}) Response {
+	return NewResponse(http.StatusMethodNotAllowed, payload)
+}
+
+func NotFoundResponse(payload interface{}) Response {
+	return NewResponse(http.StatusNotFound, payload)
+}
+
+func BadRequestResponse(payload interface{}) Response {
+	return NewResponse(http.StatusBadRequest, payload)
+}
+
+func ForbiddenResponse(payload interface{}) Response {
+	return NewResponse(http.StatusForbidden, payload)
 }

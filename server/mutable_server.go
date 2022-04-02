@@ -106,7 +106,7 @@ func (s HTTPServer) buildRequest(r *http.Request, matchCtx *uri_trie.MatchContex
 	return NewRequest(r, matchCtx.UriPattern, matchCtx.QueryParams, matchCtx.PathParams)
 }
 
-func (s HTTPServer) respondWithError(w http.ResponseWriter, serviceErr ServiceError, resp *Response, requestCtx RequestContext) (err error) {
+func (s HTTPServer) respondWithError(w http.ResponseWriter, serviceErr ServiceError, resp Response, requestCtx RequestContext) (err error) {
 	if s.attachContextForError {
 		serviceErr.AttachContext(requestCtx)
 	}
@@ -121,7 +121,7 @@ func (s HTTPServer) respondWithError(w http.ResponseWriter, serviceErr ServiceEr
 	return
 }
 
-func (s HTTPServer) respondWithServiceResponse(w http.ResponseWriter, r *Response) (err error) {
+func (s HTTPServer) respondWithServiceResponse(w http.ResponseWriter, r Response) (err error) {
 	if r.Code() == 0 {
 		return fmt.Errorf("invalid payload")
 	}

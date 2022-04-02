@@ -10,15 +10,6 @@ import (
 
 var randomGenerator = rand.New(rand.NewSource(time.Now().UnixNano()))
 
-func ProcessWithErrors(errs ...func() error) (err error) {
-	for _, errFn := range errs {
-		if err = errFn(); err != nil {
-			return
-		}
-	}
-	return
-}
-
 func EncodeBase64(data []byte) string {
 	return base64.StdEncoding.EncodeToString(data)
 }

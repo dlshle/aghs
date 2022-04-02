@@ -2,10 +2,11 @@ package server
 
 import (
 	"fmt"
-	"github.com/dlshle/aghs/logger"
 	"log"
 	"os"
 	"sync"
+
+	"github.com/dlshle/aghs/logger"
 )
 
 type MutableService interface {
@@ -113,7 +114,7 @@ func (s service) getRequestHandlingMiddlewares(routePattern, method string) []Mi
 	return nil
 }
 
-func (s service) Handle(request Request) (resp *Response, err ServiceError) {
+func (s service) Handle(request Request) (resp Response, err ServiceError) {
 	middlewares := s.getRequestHandlingMiddlewares(request.UriPattern(), request.Method())
 	if middlewares == nil {
 		err = MethodNotAllowedError(fmt.Sprintf("method %s is not allowed for uri pattern %s", request.Method(), request.UriPattern()))

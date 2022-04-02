@@ -1,3 +1,3 @@
 package server
 
-type RequestHandler func(r Request) (*Response, ServiceError)
+type RequestHandler func(r Request) (Response, ServiceError)

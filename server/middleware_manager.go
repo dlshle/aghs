@@ -46,7 +46,7 @@ func (m *middlewareManager) Run(request Request, coreHandler RequestHandler) Mid
 	return ctx
 }
 
-func (m *middlewareManager) makeMiddlewareContext(request Request, response *Response, coreHandler RequestHandler) *middlewareContext {
+func (m *middlewareManager) makeMiddlewareContext(request Request, response Response, coreHandler RequestHandler) *middlewareContext {
 	coreHandlerWrapper := func(ctx MiddlewareContext) {
 		rawCtx := ctx.(*middlewareContext)
 		rawCtx.response, rawCtx.err = coreHandler(rawCtx.request)

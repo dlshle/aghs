@@ -2,15 +2,16 @@ package server
 
 import (
 	"fmt"
-	"github.com/dlshle/aghs/logger"
 	"io"
 	"log"
 	"os"
+
+	"github.com/dlshle/aghs/logger"
 )
 
 type Service interface {
 	Id() string
-	Handle(request Request) (resp *Response, err ServiceError)
+	Handle(request Request) (resp Response, err ServiceError)
 	UriPatterns() []string
 	SupportsRoutePattern(routePattern string) bool
 	SupportsMethodForPattern(routePattern, method string) bool
@@ -32,7 +33,7 @@ func (s immutableService) getRequestHandlingMiddlewares(routePattern, method str
 	return nil
 }
 
-func (s immutableService) Handle(request Request) (resp *Response, err ServiceError) {
+func (s immutableService) Handle(request Request) (resp Response, err ServiceError) {
 	handler := s.getRequestHandlingMiddlewares(request.UriPattern(), request.Method())
 	if handler == nil {
 		err = MethodNotAllowedError(fmt.Sprintf("method %s is not allowed for uri pattern %s", request.Method(), request.UriPattern()))

@@ -2,14 +2,14 @@ package server
 
 type middlewareContext struct {
 	request  Request
-	response *Response
+	response Response
 	next     func()
 	err      ServiceError
 }
 
 type MiddlewareContext interface {
 	Request() Request
-	Response() *Response
+	Response() Response
 	Next()
 	Report(ServiceError)
 	Error() ServiceError
@@ -19,7 +19,7 @@ func (c *middlewareContext) Request() Request {
 	return c.request
 }
 
-func (c *middlewareContext) Response() *Response {
+func (c *middlewareContext) Response() Response {
 	if c.response == nil {
 		c.response = NewResponse(-1, nil)
 	}
@@ -41,12 +41,12 @@ func (c *middlewareContext) Error() ServiceError {
 type Middleware func(ctx MiddlewareContext)
 
 func middlewaresToRequestHandler(middlewares []Middleware) RequestHandler {
-	return func(r Request) (*Response, ServiceError) {
+	return func(r Request) (Response, ServiceError) {
 		return runMiddlewares(middlewares, r)
 	}
 }
 
-func runMiddlewares(middlewares []Middleware, request Request) (*Response, ServiceError) {
+func runMiddlewares(middlewares []Middleware, request Request) (Response, ServiceError) {
 	ctx := makeMiddlewareContext(middlewares, request)
 	ctx.Next()
 	return ctx.Response(), ctx.Error()

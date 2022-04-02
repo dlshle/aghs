@@ -48,14 +48,14 @@ func NewStudentService() StudentService {
 	return studentService
 }
 
-func (s StudentService) handleGetAllStudents(r server.Request) (*server.Response, server.ServiceError) {
+func (s StudentService) handleGetAllStudents(r server.Request) (server.Response, server.ServiceError) {
 	students, _ := s.studentStore.Query(func(interface{}) bool {
 		return true
 	})
 	return server.NewResponse(200, students), nil
 }
 
-func (s StudentService) handleGetStudent(r server.Request) (*server.Response, server.ServiceError) {
+func (s StudentService) handleGetStudent(r server.Request) (server.Response, server.ServiceError) {
 	studentId := r.PathParams()["sid"]
 	if studentId == "" {
 		return nil, server.BadRequestError("invalid student id in path param")
@@ -67,7 +67,7 @@ func (s StudentService) handleGetStudent(r server.Request) (*server.Response, se
 	return server.NewResponse(200, student), nil
 }
 
-func (s StudentService) handleAddStudent(r server.Request) (*server.Response, server.ServiceError) {
+func (s StudentService) handleAddStudent(r server.Request) (server.Response, server.ServiceError) {
 	var toAddStudent Student
 	studentData, err := r.Body()
 	if err != nil {
@@ -85,7 +85,7 @@ func (s StudentService) handleAddStudent(r server.Request) (*server.Response, se
 	return server.NewResponse(201, newStudent), nil
 }
 
-func (s StudentService) handleUpdateStudent(r server.Request) (*server.Response, server.ServiceError) {
+func (s StudentService) handleUpdateStudent(r server.Request) (server.Response, server.ServiceError) {
 	c_sid := r.GetContext(STUDENT_ID_CONTEXT_KEY)
 	sid, ok := c_sid.(string)
 	if !ok {
@@ -112,7 +112,7 @@ func (s StudentService) handleUpdateStudent(r server.Request) (*server.Response,
 	return server.NewResponse(200, updatedStudent), nil
 }
 
-func (s StudentService) handleDeleteStudent(r server.Request) (*server.Response, server.ServiceError) {
+func (s StudentService) handleDeleteStudent(r server.Request) (server.Response, server.ServiceError) {
 	studentId := r.PathParams()["sid"]
 	if studentId == "" {
 		return nil, server.BadRequestError("invalid student id in path param")
@@ -129,7 +129,7 @@ type LoginRequest struct {
 	Class string `json:"class"`
 }
 
-func (s StudentService) handleLogin(r server.Request) (*server.Response, server.ServiceError) {
+func (s StudentService) handleLogin(r server.Request) (server.Response, server.ServiceError) {
 	loginRequestData, err := r.Body()
 	if err != nil {
 		return nil, server.InternalError(err.Error())

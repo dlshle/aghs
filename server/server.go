@@ -2,14 +2,15 @@ package server
 
 import (
 	"fmt"
-	"github.com/dlshle/aghs/logger"
-	"github.com/dlshle/gommon/uri_trie"
-	"github.com/valyala/fasthttp"
-	"github.com/valyala/fasthttp/fasthttpadaptor"
 	"log"
 	"net"
 	"net/http"
 	"os"
+
+	"github.com/dlshle/aghs/logger"
+	"github.com/dlshle/gommon/uri_trie"
+	"github.com/valyala/fasthttp"
+	"github.com/valyala/fasthttp/fasthttpadaptor"
 )
 
 type Server interface {
@@ -67,7 +68,7 @@ func (s immutableServer) buildRequest(r *http.Request, matchCtx *uri_trie.MatchC
 	return NewRequest(r, matchCtx.UriPattern, matchCtx.QueryParams, matchCtx.PathParams)
 }
 
-func (s immutableServer) respondWithError(w http.ResponseWriter, serviceErr ServiceError, resp *Response, requestCtx RequestContext) (err error) {
+func (s immutableServer) respondWithError(w http.ResponseWriter, serviceErr ServiceError, resp Response, requestCtx RequestContext) (err error) {
 	if s.attachContextForError {
 		serviceErr.AttachContext(requestCtx)
 	}
@@ -82,11 +83,13 @@ func (s immutableServer) respondWithError(w http.ResponseWriter, serviceErr Serv
 	return
 }
 
-func (s immutableServer) respondWithServiceResponse(w http.ResponseWriter, r *Response) (err error) {
+func (s immutableServer) respondWithServiceResponse(w http.ResponseWriter, r Response) (err error) {
 	if r.Code() == 0 {
 		return fmt.Errorf("invalid payload")
 	}
-	w.Header().Set("Content-Type", r.ContentType())
+	if r.ContentType() != "" {
+		w.Header().Set("Content-Type", r.ContentType())
+	}
 	w.WriteHeader(r.Code())
 	r.IterateHeaders(func(k string, v string) {
 		w.Header().Set(k, v)
