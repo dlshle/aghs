@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/dlshle/aghs/logger"
+	"github.com/dlshle/gommon/logger"
 	"github.com/dlshle/gommon/uri_trie"
 	"github.com/valyala/fasthttp"
 	"github.com/valyala/fasthttp/fasthttpadaptor"

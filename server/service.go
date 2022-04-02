@@ -6,7 +6,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/dlshle/aghs/logger"
+	"github.com/dlshle/gommon/logger"
 )
 
 type Service interface {

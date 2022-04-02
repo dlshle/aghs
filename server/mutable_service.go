@@ -6,7 +6,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/dlshle/aghs/logger"
+	"github.com/dlshle/gommon/logger"
 )
 
 type MutableService interface {
