@@ -19,7 +19,7 @@ func toTokenClaim(mapClaim jwt.MapClaims) TokenClaim {
 
 func (c TokenClaim) IsExpired() bool {
 	if expiresAt, exists := c[ClaimKeyExpiresAt]; exists {
-		return time.Unix(expiresAt.(int64), 0).Before(time.Now())
+		return time.Unix(int64(expiresAt.(float64)), 0).Before(time.Now())
 	}
 	return false
 }
