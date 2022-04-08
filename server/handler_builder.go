@@ -43,7 +43,7 @@ func (b *pathHandlerBuilder) Post(handler RequestHandler) *pathHandlerBuilder {
 }
 
 func (b *pathHandlerBuilder) PostWithMiddlewares(handler RequestHandler, middlewares ...Middleware) *pathHandlerBuilder {
-	b.handlers[http.MethodGet] = append(middlewares, wrapHandlerAsMiddleware(handler))
+	b.handlers[http.MethodPost] = append(middlewares, wrapHandlerAsMiddleware(handler))
 	return b
 }
 
