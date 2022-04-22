@@ -92,7 +92,7 @@ func (s service) UnRegisterHandler(method, routePattern string) (err error) {
 
 func (s service) UriPatterns() []string {
 	var patterns []string
-	for pattern, _ := range s.uriMap {
+	for pattern := range s.uriMap {
 		patterns = append(patterns, pattern)
 	}
 	return patterns
