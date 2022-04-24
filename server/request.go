@@ -55,6 +55,11 @@ func (r Request) Path() string {
 	return r.r.URL.Path
 }
 
+// URI contains query params
+func (r Request) URI() string {
+	return r.r.RequestURI
+}
+
 func (r Request) PathParams() map[string]string {
 	return r.GetContext(ContextKeyPathParams).(map[string]string)
 }
