@@ -117,6 +117,11 @@ func (b *pathHandlerBuilder) TraceWithMiddlewares(handler RequestHandler, middle
 	return b
 }
 
+func (b *pathHandlerBuilder) WithMethodHandler(method string, handler RequestHandler, middlewares ...Middleware) *pathHandlerBuilder {
+	b.handlers[method] = append(middlewares, wrapHandlerAsMiddleware(handler))
+	return b
+}
+
 func (b *pathHandlerBuilder) Build() HandlersWithPath {
 	return b
 }
