@@ -51,6 +51,10 @@ func (r Request) UriPattern() string {
 	return r.GetContext(ContextKeyUriPattern).(string)
 }
 
+func (r Request) Path() string {
+	return r.r.URL.Path
+}
+
 func (r Request) PathParams() map[string]string {
 	return r.GetContext(ContextKeyPathParams).(map[string]string)
 }
