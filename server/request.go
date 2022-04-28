@@ -9,9 +9,10 @@ import (
 )
 
 const (
-	ContextKeyUriPattern  = "uri_pattern"
-	ContextKeyQueryParams = "query_params"
-	ContextKeyPathParams  = "path_params"
+	ContextKeyUriPattern     = "uri_pattern"
+	ContextKeyQueryParams    = "query_params"
+	ContextKeyPathParams     = "path_params"
+	ContextKeyMatchedService = "matched_service"
 )
 
 type Request struct {
@@ -20,11 +21,12 @@ type Request struct {
 	c  RequestContext
 }
 
-func NewRequest(r *http.Request, uriPattern string, queryParams map[string]string, pathParams map[string]string) Request {
+func NewRequest(r *http.Request, matchedSvc Service, uriPattern string, queryParams map[string]string, pathParams map[string]string) Request {
 	c := make(RequestContext)
 	c.RegisterContext(ContextKeyUriPattern, uriPattern)
 	c.RegisterContext(ContextKeyQueryParams, queryParams)
 	c.RegisterContext(ContextKeyPathParams, pathParams)
+	c.RegisterContext(ContextKeyMatchedService, matchedSvc)
 	return Request{
 		id: utils.GenerateID(),
 		r:  r,
@@ -66,6 +68,10 @@ func (r Request) PathParams() map[string]string {
 
 func (r Request) QueryParams() map[string]string {
 	return r.GetContext(ContextKeyQueryParams).(map[string]string)
+}
+
+func (r Request) MatchedService() Service {
+	return r.GetContext(ContextKeyMatchedService).(Service)
 }
 
 func (r Request) Method() string {

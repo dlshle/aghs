@@ -106,6 +106,17 @@ func (s service) SupportsMethodForPattern(routePattern, method string) bool {
 	return s.SupportsRoutePattern(routePattern) && s.uriMap[routePattern][method] != nil
 }
 
+func (s service) SupportedMethodsForPattern(pattern string) []string {
+	var supportedMethods []string
+	if s.uriMap[pattern] == nil {
+		return supportedMethods
+	}
+	for method := range s.uriMap[pattern] {
+		supportedMethods = append(supportedMethods, method)
+	}
+	return supportedMethods
+}
+
 func (s service) getRequestHandlingMiddlewares(routePattern, method string) []Middleware {
 	methodMap := s.uriMap[routePattern]
 	if methodMap != nil {

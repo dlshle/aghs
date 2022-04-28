@@ -103,7 +103,7 @@ func (s HTTPServer) HandleHTTP(w http.ResponseWriter, req *http.Request) (err er
 }
 
 func (s HTTPServer) buildRequest(r *http.Request, matchCtx *uri_trie.MatchContext) Request {
-	return NewRequest(r, matchCtx.UriPattern, matchCtx.QueryParams, matchCtx.PathParams)
+	return NewRequest(r, matchCtx.Value.(Service), matchCtx.UriPattern, matchCtx.QueryParams, matchCtx.PathParams)
 }
 
 func (s HTTPServer) respondWithError(w http.ResponseWriter, serviceErr ServiceError, resp Response, requestCtx RequestContext) (err error) {

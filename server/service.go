@@ -15,6 +15,7 @@ type Service interface {
 	UriPatterns() []string
 	SupportsRoutePattern(routePattern string) bool
 	SupportsMethodForPattern(routePattern, method string) bool
+	SupportedMethodsForPattern(pattern string) []string
 	Logger() logger.Logger
 }
 
@@ -60,6 +61,17 @@ func (s immutableService) SupportsRoutePattern(routePattern string) bool {
 
 func (s immutableService) SupportsMethodForPattern(routePattern, method string) bool {
 	return s.SupportsRoutePattern(routePattern) && s.uriMap[routePattern][method] != nil
+}
+
+func (s immutableService) SupportedMethodsForPattern(pattern string) []string {
+	var supportedMethods []string
+	if s.uriMap[pattern] == nil {
+		return supportedMethods
+	}
+	for method := range s.uriMap[pattern] {
+		supportedMethods = append(supportedMethods, method)
+	}
+	return supportedMethods
 }
 
 func (s immutableService) Logger() logger.Logger {

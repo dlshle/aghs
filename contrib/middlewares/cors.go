@@ -18,7 +18,16 @@ func CORSAllowWildcardMiddleware(ctx server.MiddlewareContext) {
 		ctx.Report(nil)
 		ctx.Response().SetCode(http.StatusNoContent)
 	}
-	ctx.Response().SetHeader(HeaderKeyAllowMethods, "*")
+	allowMethods := ctx.Request().MatchedService().SupportedMethodsForPattern(ctx.Request().UriPattern())
+	allowMethodsHeaderValue := ""
+	for _, method := range allowMethods {
+		if method == "OPTIONS" {
+			continue
+		}
+		allowMethodsHeaderValue += method + ", "
+	}
+	allowMethodsHeaderValue += "OPTIONS"
+	ctx.Response().SetHeader(HeaderKeyAllowMethods, allowMethodsHeaderValue)
 	ctx.Response().SetHeader(HeaderKeyAllowOrigin, "*")
 	ctx.Response().SetHeader(HeaderKeyAllowHeaders, "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
 	ctx.Response().SetHeader(HeaderKeyVary, "Origin")

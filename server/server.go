@@ -9,8 +9,6 @@ import (
 
 	"github.com/dlshle/gommon/logger"
 	"github.com/dlshle/gommon/uri_trie"
-	"github.com/valyala/fasthttp"
-	"github.com/valyala/fasthttp/fasthttpadaptor"
 )
 
 type Server interface {
@@ -18,6 +16,7 @@ type Server interface {
 }
 
 type immutableServer struct {
+	engine                Engine
 	addr                  string
 	uriTrie               *uri_trie.TrieTree
 	middlewares           []Middleware
@@ -65,7 +64,7 @@ func (s immutableServer) HandleHTTP(w http.ResponseWriter, req *http.Request) (e
 }
 
 func (s immutableServer) buildRequest(r *http.Request, matchCtx *uri_trie.MatchContext) Request {
-	return NewRequest(r, matchCtx.UriPattern, matchCtx.QueryParams, matchCtx.PathParams)
+	return NewRequest(r, matchCtx.Value.(Service), matchCtx.UriPattern, matchCtx.QueryParams, matchCtx.PathParams)
 }
 
 func (s immutableServer) respondWithError(w http.ResponseWriter, serviceErr ServiceError, resp Response, requestCtx RequestContext) (err error) {
@@ -113,7 +112,11 @@ func (s immutableServer) Start() error {
 		s.logger.Errorf("error starting server at addr %s: %s", addr, err.Error())
 		return err
 	}
-	return fasthttp.Serve(listener, fasthttpadaptor.NewFastHTTPHandler(s))
+	return s.startEngine(listener)
+}
+
+func (s immutableServer) startEngine(listener net.Listener) error {
+	return s.engine(listener, s)
 }
 
 type Builder interface {
@@ -128,6 +131,7 @@ type Builder interface {
 }
 
 type serverBuilder struct {
+	engine                Engine
 	addr                  string
 	uriTrie               *uri_trie.TrieTree
 	middlewares           []Middleware
@@ -135,6 +139,11 @@ type serverBuilder struct {
 	attachContextForError bool
 	serviceIdSet          map[string]bool
 	err                   error
+}
+
+func (s *serverBuilder) Engine(engine Engine) Builder {
+	s.engine = engine
+	return s
 }
 
 func (s *serverBuilder) Address(addr string) Builder {
@@ -212,5 +221,6 @@ func NewBuilder() Builder {
 		serviceIdSet: make(map[string]bool),
 		uriTrie:      uri_trie.NewTrieTree(),
 		logger:       logger.NewLevelLogger(os.Stdout, "[HTTPServer]", log.Ldate|log.Ltime, logger.TRACE),
+		engine:       NetEngine,
 	}
 }
