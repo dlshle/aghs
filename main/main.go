@@ -10,6 +10,7 @@ import (
 func main() {
 	var requestCounter uint32 = 0
 	httpServer, err := server.NewBuilder().
+		Engine(server.FastHTTPEngine).
 		Address("0.0.0.0:1234").
 		WithService(NewStudentService()).
 		WithMiddleware(middlewares.CORSAllowWildcardMiddleware).

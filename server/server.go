@@ -89,10 +89,10 @@ func (s immutableServer) respondWithServiceResponse(w http.ResponseWriter, r Res
 	if r.ContentType() != "" {
 		w.Header().Set("Content-Type", r.ContentType())
 	}
-	w.WriteHeader(r.Code())
 	r.IterateHeaders(func(k string, v string) {
 		w.Header().Set(k, v)
 	})
+	w.WriteHeader(r.Code())
 	if r.Code() == http.StatusNoContent {
 		return
 	}
@@ -120,6 +120,7 @@ func (s immutableServer) startEngine(listener net.Listener) error {
 }
 
 type Builder interface {
+	Engine(engine Engine) Builder
 	Address(string) Builder
 	WithServices([]Service) Builder
 	WithService(Service) Builder
@@ -190,6 +191,7 @@ func (s *serverBuilder) Build() (Server, error) {
 		return nil, s.err
 	}
 	return immutableServer{
+		engine:                s.engine,
 		addr:                  s.addr,
 		uriTrie:               s.uriTrie,
 		middlewares:           s.middlewares,
