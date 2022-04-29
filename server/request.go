@@ -39,14 +39,23 @@ func (r Request) Id() string {
 }
 
 func (r Request) String() string {
-	return fmt.Sprintf(`Request{"id":"%s","method":"%s","url":"%s","remoteAddr":"%s","header":"%s","context":"%s"`,
+	return fmt.Sprintf(`Request{"id":"%s","method":"%s","url":"%s","remoteAddr":"%s","header":"%s","context":"%s","body":"%s"}`,
 		r.id,
 		r.Method(),
 		r.r.URL.String(),
 		r.RemoteAddress(),
 		r.Header(),
 		r.Context(),
+		r.tryGetBody(),
 	)
+}
+
+func (r Request) tryGetBody() string {
+	body, err := r.Body()
+	if err != nil {
+		return "ERROR: unable to read body due to " + err.Error()
+	}
+	return string(body)
 }
 
 func (r Request) UriPattern() string {
