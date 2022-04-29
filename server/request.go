@@ -16,9 +16,10 @@ const (
 )
 
 type Request struct {
-	id string
-	r  *http.Request
-	c  RequestContext
+	id   string
+	r    *http.Request
+	c    RequestContext
+	body []byte
 }
 
 func NewRequest(r *http.Request, matchedSvc Service, uriPattern string, queryParams map[string]string, pathParams map[string]string) Request {
@@ -92,7 +93,14 @@ func (r Request) Header() http.Header {
 }
 
 func (r Request) Body() ([]byte, error) {
-	return ioutil.ReadAll(r.r.Body)
+	if r.body == nil {
+		bodyBytes, err := ioutil.ReadAll(r.r.Body)
+		if err != nil {
+			return nil, err
+		}
+		r.body = bodyBytes
+	}
+	return r.body, nil
 }
 
 func (r Request) UnmarshalBody(holder interface{}) error {
