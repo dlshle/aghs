@@ -15,7 +15,27 @@ const (
 	ContextKeyMatchedService = "matched_service"
 )
 
-type Request struct {
+type Request interface {
+	Id() string
+	String() string
+	UriPattern() string
+	Path() string
+	URI() string
+	PathParams() map[string]string
+	QueryParams() map[string]string
+	MatchedService() Service
+	Method() string
+	Header() http.Header
+	Body() ([]byte, error)
+	UnmarshalBody(holder interface{}) error
+	RemoteAddress() string
+	GetContext(key string) interface{}
+	RegisterContext(key string, value interface{})
+	UnRegisterContext(key string) bool
+	Context() RequestContext
+}
+
+type request struct {
 	id   string
 	r    *http.Request
 	c    RequestContext
@@ -28,18 +48,18 @@ func NewRequest(r *http.Request, matchedSvc Service, uriPattern string, queryPar
 	c.RegisterContext(ContextKeyQueryParams, queryParams)
 	c.RegisterContext(ContextKeyPathParams, pathParams)
 	c.RegisterContext(ContextKeyMatchedService, matchedSvc)
-	return Request{
+	return &request{
 		id: utils.GenerateID(),
 		r:  r,
 		c:  c,
 	}
 }
 
-func (r Request) Id() string {
+func (r *request) Id() string {
 	return r.id
 }
 
-func (r Request) String() string {
+func (r *request) String() string {
 	return fmt.Sprintf(`Request{"id":"%s","method":"%s","url":"%s","remoteAddr":"%s","header":"%s","context":"%s","body":"%s"}`,
 		r.id,
 		r.Method(),
@@ -51,7 +71,7 @@ func (r Request) String() string {
 	)
 }
 
-func (r Request) tryGetBody() string {
+func (r *request) tryGetBody() string {
 	body, err := r.Body()
 	if err != nil {
 		return "ERROR: unable to read body due to " + err.Error()
@@ -59,40 +79,40 @@ func (r Request) tryGetBody() string {
 	return string(body)
 }
 
-func (r Request) UriPattern() string {
+func (r *request) UriPattern() string {
 	return r.GetContext(ContextKeyUriPattern).(string)
 }
 
-func (r Request) Path() string {
+func (r *request) Path() string {
 	return r.r.URL.Path
 }
 
 // URI contains query params
-func (r Request) URI() string {
+func (r *request) URI() string {
 	return r.r.RequestURI
 }
 
-func (r Request) PathParams() map[string]string {
+func (r *request) PathParams() map[string]string {
 	return r.GetContext(ContextKeyPathParams).(map[string]string)
 }
 
-func (r Request) QueryParams() map[string]string {
+func (r *request) QueryParams() map[string]string {
 	return r.GetContext(ContextKeyQueryParams).(map[string]string)
 }
 
-func (r Request) MatchedService() Service {
+func (r *request) MatchedService() Service {
 	return r.GetContext(ContextKeyMatchedService).(Service)
 }
 
-func (r Request) Method() string {
+func (r *request) Method() string {
 	return r.r.Method
 }
 
-func (r Request) Header() http.Header {
+func (r *request) Header() http.Header {
 	return r.r.Header
 }
 
-func (r Request) Body() ([]byte, error) {
+func (r *request) Body() ([]byte, error) {
 	if r.body == nil {
 		bodyBytes, err := ioutil.ReadAll(r.r.Body)
 		if err != nil {
@@ -103,7 +123,7 @@ func (r Request) Body() ([]byte, error) {
 	return r.body, nil
 }
 
-func (r Request) UnmarshalBody(holder interface{}) error {
+func (r *request) UnmarshalBody(holder interface{}) error {
 	bodyStream, err := r.Body()
 	if err != nil {
 		return err
@@ -111,22 +131,22 @@ func (r Request) UnmarshalBody(holder interface{}) error {
 	return json.Unmarshal(bodyStream, holder)
 }
 
-func (r Request) RemoteAddress() string {
+func (r *request) RemoteAddress() string {
 	return r.r.RemoteAddr
 }
 
-func (r Request) GetContext(key string) interface{} {
+func (r *request) GetContext(key string) interface{} {
 	return r.c.GetContext(key)
 }
 
-func (r Request) RegisterContext(key string, value interface{}) {
+func (r *request) RegisterContext(key string, value interface{}) {
 	r.c.RegisterContext(key, value)
 }
 
-func (r Request) UnRegisterContext(key string) bool {
+func (r *request) UnRegisterContext(key string) bool {
 	return r.c.UnRegisterContext(key)
 }
 
-func (r Request) Context() RequestContext {
+func (r *request) Context() RequestContext {
 	return r.c
 }
