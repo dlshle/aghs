@@ -2,9 +2,10 @@ package utils
 
 import (
 	"fmt"
-	"github.com/dlshle/gommon/ctimer"
 	"sync"
 	"time"
+
+	"github.com/dlshle/gommon/ctimer"
 )
 
 const (
