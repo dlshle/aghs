@@ -137,6 +137,7 @@ type CHandlerBuilder interface {
 	ErrorHandler(func(error) interface{}) CHandlerBuilder
 	OnRequest(func(CHandle) Response) CHandlerBuilder
 	Build() (cHandler, error)
+	MustBuild() cHandler
 }
 
 type cHandlerBuilder struct {
@@ -199,6 +200,14 @@ func (b *cHandlerBuilder) Build() (h cHandler, e error) {
 	}
 	h = *(b.cHandlerRef)
 	return
+}
+
+func (b *cHandlerBuilder) MustBuild() cHandler {
+	handler, err := b.Build()
+	if err != nil {
+		panic(err)
+	}
+	return handler
 }
 
 func IsMissingRequiredFieldError(err error) bool {

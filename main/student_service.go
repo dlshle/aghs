@@ -28,14 +28,6 @@ func NewStudentService() StudentService {
 		NewAuthMiddleware(),
 		store.NewInMemoryKVStore(200),
 	}
-	cHandler, err := server.NewCHandlerBuilder().AddRequiredQueryParam("timestamp").RequireBody().Unmarshaller(func(b []byte) (interface{}, error) {
-		return nil, nil
-	}).OnRequest(func(handle server.CHandle) server.Response {
-		return server.NewResponse(http.StatusOK, nil)
-	}).Build()
-	if err != nil {
-		panic(err)
-	}
 	service, _ := server.NewServiceBuilder().
 		Id("student").
 		WithRouteHandlers(
@@ -54,7 +46,11 @@ func NewStudentService() StudentService {
 				Post(studentService.handleLogin).
 				Build()).
 		WithRouteHandlers(server.PathHandlerBuilder(routeStatus).
-			Get(cHandler.HandleRequest).
+			Get(server.NewCHandlerBuilder().AddRequiredQueryParam("timestamp").RequireBody().Unmarshaller(func(b []byte) (interface{}, error) {
+				return nil, nil
+			}).OnRequest(func(handle server.CHandle) server.Response {
+				return server.NewResponse(http.StatusOK, nil)
+			}).MustBuild().HandleRequest).
 			Build()).
 		Build()
 	studentService.Service = service
