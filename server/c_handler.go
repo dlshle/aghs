@@ -118,7 +118,10 @@ func (h cHandler) getAndCheckData(request Request) (interface{}, error) {
 	if len(data) == 0 && h.isDataRequired {
 		return nil, errors.Error("bad request: request body is missing")
 	}
-	return h.unmarshalFactory(data)
+	if h.unmarshalFactory != nil {
+		return h.unmarshalFactory(data)
+	}
+	return data, nil
 }
 
 func (h cHandler) handleError(err error) interface{} {
@@ -194,10 +197,13 @@ func (b *cHandlerBuilder) Build() (h cHandler, e error) {
 		e = errors.Error("no request handler set")
 		return
 	}
-	if b.cHandlerRef.isDataRequired && b.cHandlerRef.unmarshalFactory == nil {
-		e = errors.Error("no unmarshaller set when data is required")
-		return
-	}
+	// we can have data w/out unmarshaller
+	/*
+		if b.cHandlerRef.isDataRequired && b.cHandlerRef.unmarshalFactory == nil {
+			e = errors.Error("no unmarshaller set when data is required")
+			return
+		}
+	*/
 	h = *(b.cHandlerRef)
 	return
 }
