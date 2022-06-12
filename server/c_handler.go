@@ -32,7 +32,7 @@ func (h cHandle) QueryParam(key string) string {
 }
 
 func (h cHandle) PathParam(key string) string {
-	return h.request.QueryParams()[key]
+	return h.request.PathParams()[key]
 }
 
 func (h cHandle) Header(key string) string {
