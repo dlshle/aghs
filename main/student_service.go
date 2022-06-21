@@ -46,9 +46,9 @@ func NewStudentService() StudentService {
 				Post(studentService.handleLogin).
 				Build()).
 		WithRouteHandlers(server.PathHandlerBuilder(routeStatus).
-			Get(server.NewCHandlerBuilder().AddRequiredQueryParam("timestamp").RequireBody().Unmarshaller(func(b []byte) (interface{}, error) {
-				return nil, nil
-			}).OnRequest(func(handle server.CHandle) server.Response {
+			Get(server.NewCHandlerBuilder[[]byte]().AddRequiredQueryParam("timestamp").RequireBody().Unmarshaller(func(b []byte) ([]byte, error) {
+				return b, nil
+			}).OnRequest(func(handle server.CHandle[[]byte]) server.Response {
 				return server.NewResponse(http.StatusOK, nil)
 			}).MustBuild().HandleRequest).
 			Build()).
