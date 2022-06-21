@@ -1,61 +1,68 @@
 package server
 
 import (
+	"strings"
+
 	"github.com/dlshle/gommon/errors"
 	"github.com/dlshle/gommon/utils"
-	"strings"
 )
 
 // chandle(request).Data() -> gets unmarshalled data
 // chandle(request).QueryParam(x) -> string
 // chandle(request).PathParam(y) -> string
 
-type CHandle interface {
-	Data() interface{}
+type CHandle[T any] interface {
+	Data() T
+	Body() []byte
 	QueryParam(string) string
 	PathParam(string) string
 	Header(string) string
 	Request() Request
 }
 
-type cHandle struct {
-	data    interface{}
+type cHandle[T any] struct {
+	data    T
 	request Request
 }
 
-func (h cHandle) Data() interface{} {
+func (h cHandle[T]) Data() T {
 	return h.data
 }
 
-func (h cHandle) QueryParam(key string) string {
+func (h cHandle[T]) Body() []byte {
+	body, _ := h.request.Body()
+	return body
+}
+
+func (h cHandle[T]) QueryParam(key string) string {
 	return h.request.QueryParams()[key]
 }
 
-func (h cHandle) PathParam(key string) string {
+func (h cHandle[T]) PathParam(key string) string {
 	return h.request.PathParams()[key]
 }
 
-func (h cHandle) Header(key string) string {
+func (h cHandle[T]) Header(key string) string {
 	return h.request.Header().Get(key)
 }
 
-func (h cHandle) Request() Request {
+func (h cHandle[T]) Request() Request {
 	return h.request
 }
 
-type cHandler struct {
-	unmarshalFactory       func([]byte) (interface{}, error)
+type cHandler[T any] struct {
+	unmarshalFactory       func([]byte) (T, error)
 	isDataRequired         bool
 	requiredPathParams     map[string]bool
 	requiredQueryParams    map[string]bool
 	requiredHeaderFields   map[string]bool
-	onRequestHandle        func(CHandle) Response
+	onRequestHandle        func(CHandle[T]) Response
 	onErrorResponseFactory func(error) interface{}
 }
 
-func (h cHandler) HandleRequest(r Request) (Response, ServiceError) {
+func (h cHandler[T]) HandleRequest(r Request) (Response, ServiceError) {
 	var (
-		data interface{}
+		data T
 		err  error
 	)
 	err = utils.ProcessWithErrors(func() error {
@@ -74,14 +81,14 @@ func (h cHandler) HandleRequest(r Request) (Response, ServiceError) {
 		}
 		return InternalServerErrorResponse(h.handleError(err)), nil
 	}
-	handle := cHandle{
+	handle := cHandle[T]{
 		data:    data,
 		request: r,
 	}
 	return h.onRequestHandle(handle), nil
 }
 
-func (h cHandler) checkRequiredHeaderFields(request Request) error {
+func (h cHandler[T]) checkRequiredHeaderFields(request Request) error {
 	for key := range h.requiredHeaderFields {
 		if request.Header().Get(key) == "" {
 			return errors.Error("bad request: required header field " + key + " is missing")
@@ -90,7 +97,7 @@ func (h cHandler) checkRequiredHeaderFields(request Request) error {
 	return nil
 }
 
-func (h cHandler) checkRequiredPathParams(request Request) error {
+func (h cHandler[T]) checkRequiredPathParams(request Request) error {
 	pathParams := request.PathParams()
 	for k := range h.requiredPathParams {
 		if pathParams[k] == "" {
@@ -100,7 +107,7 @@ func (h cHandler) checkRequiredPathParams(request Request) error {
 	return nil
 }
 
-func (h cHandler) checkRequiredQueryParams(request Request) error {
+func (h cHandler[T]) checkRequiredQueryParams(request Request) error {
 	queryParams := request.QueryParams()
 	for k := range h.requiredQueryParams {
 		if queryParams[k] == "" {
@@ -110,46 +117,47 @@ func (h cHandler) checkRequiredQueryParams(request Request) error {
 	return nil
 }
 
-func (h cHandler) getAndCheckData(request Request) (interface{}, error) {
+func (h cHandler[T]) getAndCheckData(request Request) (T, error) {
+	var zeroVal T
 	data, err := request.Body()
 	if err != nil {
-		return nil, err
+		return zeroVal, err
 	}
 	if len(data) == 0 && h.isDataRequired {
-		return nil, errors.Error("bad request: request body is missing")
+		return zeroVal, errors.Error("bad request: request body is missing")
 	}
 	if h.unmarshalFactory != nil {
 		return h.unmarshalFactory(data)
 	}
-	return data, nil
+	return zeroVal, nil
 }
 
-func (h cHandler) handleError(err error) interface{} {
+func (h cHandler[T]) handleError(err error) interface{} {
 	if h.onErrorResponseFactory != nil {
 		return h.onErrorResponseFactory(err)
 	}
 	return err.Error()
 }
 
-type CHandlerBuilder interface {
-	AddRequiredQueryParam(key string) CHandlerBuilder
-	AddRequiredPathParam(key string) CHandlerBuilder
-	AddRequiredHeaderField(key string) CHandlerBuilder
-	RequireBody() CHandlerBuilder
-	Unmarshaller(func([]byte) (interface{}, error)) CHandlerBuilder
-	ErrorHandler(func(error) interface{}) CHandlerBuilder
-	OnRequest(func(CHandle) Response) CHandlerBuilder
-	Build() (cHandler, error)
-	MustBuild() cHandler
+type CHandlerBuilder[T any] interface {
+	AddRequiredQueryParam(key string) CHandlerBuilder[T]
+	AddRequiredPathParam(key string) CHandlerBuilder[T]
+	AddRequiredHeaderField(key string) CHandlerBuilder[T]
+	RequireBody() CHandlerBuilder[T]
+	Unmarshaller(func([]byte) (T, error)) CHandlerBuilder[T]
+	ErrorHandler(func(error) interface{}) CHandlerBuilder[T]
+	OnRequest(func(CHandle[T]) Response) CHandlerBuilder[T]
+	Build() (cHandler[T], error)
+	MustBuild() cHandler[T]
 }
 
-type cHandlerBuilder struct {
-	cHandlerRef *cHandler
+type cHandlerBuilder[T any] struct {
+	cHandlerRef *cHandler[T]
 }
 
-func NewCHandlerBuilder() CHandlerBuilder {
-	return &cHandlerBuilder{
-		&cHandler{
+func NewCHandlerBuilder[T any]() CHandlerBuilder[T] {
+	return &cHandlerBuilder[T]{
+		&cHandler[T]{
 			requiredPathParams:   make(map[string]bool),
 			requiredQueryParams:  make(map[string]bool),
 			requiredHeaderFields: make(map[string]bool),
@@ -157,42 +165,42 @@ func NewCHandlerBuilder() CHandlerBuilder {
 	}
 }
 
-func (b *cHandlerBuilder) AddRequiredHeaderField(key string) CHandlerBuilder {
+func (b *cHandlerBuilder[T]) AddRequiredHeaderField(key string) CHandlerBuilder[T] {
 	b.cHandlerRef.requiredHeaderFields[key] = true
 	return b
 }
 
-func (b *cHandlerBuilder) AddRequiredQueryParam(key string) CHandlerBuilder {
+func (b *cHandlerBuilder[T]) AddRequiredQueryParam(key string) CHandlerBuilder[T] {
 	b.cHandlerRef.requiredQueryParams[key] = true
 	return b
 }
 
-func (b *cHandlerBuilder) AddRequiredPathParam(key string) CHandlerBuilder {
+func (b *cHandlerBuilder[T]) AddRequiredPathParam(key string) CHandlerBuilder[T] {
 	b.cHandlerRef.requiredPathParams[key] = true
 	return b
 }
 
-func (b *cHandlerBuilder) RequireBody() CHandlerBuilder {
+func (b *cHandlerBuilder[T]) RequireBody() CHandlerBuilder[T] {
 	b.cHandlerRef.isDataRequired = true
 	return b
 }
 
-func (b *cHandlerBuilder) Unmarshaller(unmarshaller func([]byte) (interface{}, error)) CHandlerBuilder {
+func (b *cHandlerBuilder[T]) Unmarshaller(unmarshaller func([]byte) (T, error)) CHandlerBuilder[T] {
 	b.cHandlerRef.unmarshalFactory = unmarshaller
 	return b
 }
 
-func (b *cHandlerBuilder) ErrorHandler(callback func(error) interface{}) CHandlerBuilder {
+func (b *cHandlerBuilder[T]) ErrorHandler(callback func(error) interface{}) CHandlerBuilder[T] {
 	b.cHandlerRef.onErrorResponseFactory = callback
 	return b
 }
 
-func (b *cHandlerBuilder) OnRequest(handler func(CHandle) Response) CHandlerBuilder {
+func (b *cHandlerBuilder[T]) OnRequest(handler func(CHandle[T]) Response) CHandlerBuilder[T] {
 	b.cHandlerRef.onRequestHandle = handler
 	return b
 }
 
-func (b *cHandlerBuilder) Build() (h cHandler, e error) {
+func (b *cHandlerBuilder[T]) Build() (h cHandler[T], e error) {
 	if b.cHandlerRef.onRequestHandle == nil {
 		e = errors.Error("no request handler set")
 		return
@@ -208,12 +216,16 @@ func (b *cHandlerBuilder) Build() (h cHandler, e error) {
 	return
 }
 
-func (b *cHandlerBuilder) MustBuild() cHandler {
+func (b *cHandlerBuilder[T]) MustBuild() cHandler[T] {
 	handler, err := b.Build()
 	if err != nil {
 		panic(err)
 	}
 	return handler
+}
+
+func DefaultBytesDataUnmarshaller(data []byte) ([]byte, error) {
+	return data, nil
 }
 
 func IsMissingRequiredFieldError(err error) bool {
