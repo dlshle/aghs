@@ -2,10 +2,8 @@ package server
 
 import (
 	"fmt"
-	"log"
 	"net"
 	"net/http"
-	"os"
 
 	"github.com/dlshle/gommon/logger"
 	"github.com/dlshle/gommon/uri_trie"
@@ -28,7 +26,7 @@ func NewHTTPServer(addr string) HTTPServer {
 		uriTrie:               uri_trie.NewTrieTree(),
 		services:              make(map[string]Service),
 		middlewareManager:     NewMiddlewareManager(),
-		logger:                logger.NewLevelLogger(os.Stdout, "[HTTPServer]", log.Ldate|log.Ltime, logger.TRACE),
+		logger:                logger.GlobalLogger.WithPrefix("[HTTPServer]"),
 		attachContextForError: false,
 	}
 }

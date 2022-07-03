@@ -179,7 +179,7 @@ func (b *immutableServiceBuilder) Id(id string) ServiceBuilder {
 
 func (b *immutableServiceBuilder) LogWriter(writer io.Writer) ServiceBuilder {
 	if b.s.id != "" {
-		b.s.logger = logger.NewLevelLogger(writer, fmt.Sprintf("[service-%s]", b.s.id), log.Ldate|log.Ltime, logger.TRACE)
+		b.s.logger = logger.GlobalLogger.WithPrefix("[service-" + b.s.id + "]")
 	}
 	b.writer = writer
 	return b

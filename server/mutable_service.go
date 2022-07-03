@@ -2,8 +2,6 @@ package server
 
 import (
 	"fmt"
-	"log"
-	"os"
 	"sync"
 
 	"github.com/dlshle/gommon/logger"
@@ -31,7 +29,7 @@ func NewService(id string) MutableService {
 		uriMap:      make(map[string]map[string][]Middleware),
 		lock:        new(sync.RWMutex),
 		middlewares: make([]Middleware, 0),
-		logger:      logger.NewLevelLogger(os.Stdout, fmt.Sprintf("[service-%s]", id), log.Ldate|log.Ltime, logger.TRACE),
+		logger:      logger.GlobalLogger.WithPrefix("[service-" + id + "]"),
 	}
 }
 

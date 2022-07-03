@@ -2,10 +2,8 @@ package server
 
 import (
 	"fmt"
-	"log"
 	"net"
 	"net/http"
-	"os"
 
 	"github.com/dlshle/gommon/logger"
 	"github.com/dlshle/gommon/uri_trie"
@@ -222,7 +220,7 @@ func NewBuilder() Builder {
 		middlewares:  make([]Middleware, 0),
 		serviceIdSet: make(map[string]bool),
 		uriTrie:      uri_trie.NewTrieTree(),
-		logger:       logger.NewLevelLogger(os.Stdout, "[HTTPServer]", log.Ldate|log.Ltime, logger.TRACE),
+		logger:       logger.GlobalLogger.WithPrefix("[HTTPServer]"),
 		engine:       NetEngine,
 	}
 }
