@@ -1,8 +1,9 @@
 package middlewares
 
 import (
-	"github.com/dlshle/aghs/server"
 	"net/http"
+
+	"github.com/dlshle/aghs/server"
 )
 
 const (
@@ -15,7 +16,7 @@ const (
 func CORSAllowWildcardMiddleware(ctx server.MiddlewareContext) {
 	ctx.Next()
 	ctx.Response().SetHeader(HeaderKeyAllowOrigin, "*")
-	ctx.Response().SetHeader(HeaderKeyAllowHeaders, "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+	ctx.Response().SetHeader(HeaderKeyAllowHeaders, "*")
 	ctx.Response().SetHeader(HeaderKeyVary, "Origin")
 	ctx.Report(nil)
 	allowMethods := ctx.Request().MatchedService().SupportedMethodsForPattern(ctx.Request().UriPattern())
