@@ -42,21 +42,25 @@ func (s immutableServer) HandleHTTP(w http.ResponseWriter, req *http.Request) (e
 	if err != nil {
 		return s.respondWithError(w, NotFoundError(fmt.Sprintf("route %s is undefined", uri)), nil, nil)
 	}
-	request := s.buildRequest(req, matchCtx)
-	traceID := request.Id()
-	s.logger.Infof("[%s] receive request %s", traceID, request.String())
+	serverRequest := s.buildRequest(req, matchCtx)
+	traceID := serverRequest.Id()
+	s.logger.Infof("[%s] receive request %s", traceID, serverRequest.String())
 	middlewares := append(s.middlewares, wrapHandlerAsMiddleware(matchCtx.Value.(Service).Handle))
-	resp, serviceErr := runMiddlewares(middlewares, request)
+	resp, serviceErr := runMiddlewares(middlewares, serverRequest)
+	defer func() {
+		serverRequest.(*request).recycle()
+		resp.(*response).recycle()
+	}()
 	if serviceErr != nil {
-		return s.respondWithError(w, serviceErr, resp, request.Context())
+		return s.respondWithError(w, serviceErr, resp, serverRequest.Context())
 	}
 	// service handler(core handler) will set middleware.Ctx.response to nil when it doesn't have proper handler operation?
 	if resp == nil {
-		return s.respondWithError(w, InternalError("invalid handler operation"), resp, request.Context())
+		return s.respondWithError(w, InternalError("invalid handler operation"), resp, serverRequest.Context())
 	}
 	err = s.respondWithServiceResponse(w, resp)
 	if err != nil {
-		return s.respondWithError(w, InternalError(err.Error()), resp, request.Context())
+		return s.respondWithError(w, InternalError(err.Error()), resp, serverRequest.Context())
 	}
 	return err
 }

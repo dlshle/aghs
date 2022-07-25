@@ -1,5 +1,13 @@
 package server
 
+import "sync"
+
+var middlewareContextPool sync.Pool = sync.Pool{
+	New: func() any {
+		return new(middlewareContext)
+	},
+}
+
 type middlewareContext struct {
 	request  Request
 	response Response
@@ -13,6 +21,18 @@ type MiddlewareContext interface {
 	Next()
 	Report(ServiceError)
 	Error() ServiceError
+	recycle()
+}
+
+func newMiddlewareContext(request Request, response Response) *middlewareContext {
+	ctx := middlewareContextPool.Get().(*middlewareContext)
+	ctx.request = request
+	ctx.response = response
+	return ctx
+}
+
+func (c *middlewareContext) recycle() {
+	middlewareContextPool.Put(c)
 }
 
 func (c *middlewareContext) Request() Request {
@@ -49,16 +69,16 @@ func middlewaresToRequestHandler(middlewares []Middleware) RequestHandler {
 func runMiddlewares(middlewares []Middleware, request Request) (Response, ServiceError) {
 	ctx := makeMiddlewareContext(middlewares, request)
 	ctx.Next()
+	defer func() {
+		ctx.recycle()
+	}()
 	return ctx.Response(), ctx.Error()
 }
 
 func makeMiddlewareContext(middlewares []Middleware, request Request) MiddlewareContext {
 	response := NewResponse(0, nil)
 	currIndex := 0
-	ctx := &middlewareContext{
-		request:  request,
-		response: response,
-	}
+	ctx := newMiddlewareContext(request, response)
 	nextFunc := func() {
 		var currMiddleware Middleware
 		if ctx.err != nil || currIndex >= len(middlewares) {

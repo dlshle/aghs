@@ -3,9 +3,20 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/dlshle/aghs/utils"
 	"io/ioutil"
 	"net/http"
+	"sync"
+
+	"github.com/dlshle/aghs/utils"
+)
+
+var (
+	requestPool sync.Pool = sync.Pool{New: func() any {
+		return new(request)
+	}}
+	requestContextPool sync.Pool = sync.Pool{New: func() any {
+		return make(RequestContext)
+	}}
 )
 
 const (
@@ -43,16 +54,24 @@ type request struct {
 }
 
 func NewRequest(r *http.Request, matchedSvc Service, uriPattern string, queryParams map[string]string, pathParams map[string]string) Request {
-	c := make(RequestContext)
+	c := requestContextPool.Get().(RequestContext)
 	c.RegisterContext(ContextKeyUriPattern, uriPattern)
 	c.RegisterContext(ContextKeyQueryParams, queryParams)
 	c.RegisterContext(ContextKeyPathParams, pathParams)
 	c.RegisterContext(ContextKeyMatchedService, matchedSvc)
-	return &request{
-		id: utils.GenerateID(),
-		r:  r,
-		c:  c,
-	}
+	request := requestPool.Get().(*request)
+	request.id = utils.GenerateID()
+	request.r = r
+	request.c = c
+	return request
+}
+
+func (r *request) recycle() {
+	r.body = nil
+	r.id = ""
+	r.r = nil
+	requestContextPool.Put(r.c)
+	requestPool.Put(r)
 }
 
 func (r *request) Id() string {

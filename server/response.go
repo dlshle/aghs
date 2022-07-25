@@ -3,9 +3,14 @@ package server
 import (
 	"encoding/json"
 	"net/http"
+	"sync"
 
 	"github.com/dlshle/gommon/stringz"
 )
+
+var responsePool sync.Pool = sync.Pool{New: func() any {
+	return new(response)
+}}
 
 type Response interface {
 	Code() int
@@ -27,7 +32,7 @@ type response struct {
 }
 
 func NewResponse(code int, payload interface{}) Response {
-	return &response{code, payload, "application/json; charset=UTF-8", make(map[string]string)}
+	return NewResponseWithContentType(code, payload, "application/json; charset=UTF-8")
 }
 
 func NewPlainTextResponse(code int, payload interface{}) Response {
@@ -35,7 +40,20 @@ func NewPlainTextResponse(code int, payload interface{}) Response {
 }
 
 func NewResponseWithContentType(code int, payload interface{}, contentType string) Response {
-	return &response{code, payload, contentType, make(map[string]string)}
+	r := responsePool.Get().(*response)
+	r.code = code
+	r.payload = payload
+	r.contentType = contentType
+	r.header = make(map[string]string)
+	return r
+}
+
+func (r *response) recycle() {
+	r.code = -1
+	r.payload = nil
+	r.contentType = ""
+	r.header = nil
+	responsePool.Put(r)
 }
 
 func (r *response) Code() int {
