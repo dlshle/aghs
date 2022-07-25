@@ -48,6 +48,7 @@ func (s immutableServer) HandleHTTP(w http.ResponseWriter, req *http.Request) (e
 	middlewares := append(s.middlewares, wrapHandlerAsMiddleware(matchCtx.Value.(Service).Handle))
 	resp, serviceErr := runMiddlewares(middlewares, serverRequest)
 	defer func() {
+		// matchCtx.Recycle()
 		serverRequest.(*request).recycle()
 		resp.(*response).recycle()
 	}()

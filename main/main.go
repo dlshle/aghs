@@ -1,16 +1,17 @@
 package main
 
 import (
-	"github.com/dlshle/aghs/contrib/middlewares"
-	"github.com/dlshle/aghs/server"
 	"strconv"
 	"sync/atomic"
+
+	"github.com/dlshle/aghs/contrib/middlewares"
+	"github.com/dlshle/aghs/server"
 )
 
 func main() {
 	var requestCounter uint32 = 0
 	httpServer, err := server.NewBuilder().
-		Engine(server.FastHTTPEngine).
+		Engine(server.NetEngine).
 		Address("0.0.0.0:1234").
 		WithService(NewStudentService()).
 		WithMiddleware(middlewares.CORSAllowWildcardMiddleware).
