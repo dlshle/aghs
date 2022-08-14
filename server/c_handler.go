@@ -145,6 +145,7 @@ type CHandlerBuilder[T any] interface {
 	AddRequiredHeaderField(key string) CHandlerBuilder[T]
 	RequireBody() CHandlerBuilder[T]
 	Unmarshaller(func([]byte) (T, error)) CHandlerBuilder[T]
+	UseDefaultUnmarshaller() CHandlerBuilder[T]
 	ErrorHandler(func(error) interface{}) CHandlerBuilder[T]
 	OnRequest(func(CHandle[T]) Response) CHandlerBuilder[T]
 	Build() (cHandler[T], error)
@@ -182,6 +183,10 @@ func (b *cHandlerBuilder[T]) AddRequiredPathParam(key string) CHandlerBuilder[T]
 
 func (b *cHandlerBuilder[T]) RequireBody() CHandlerBuilder[T] {
 	b.cHandlerRef.isDataRequired = true
+	return b
+}
+
+func (b *cHandlerBuilder[T]) UseDefaultUnmarshaller() CHandlerBuilder[T] {
 	b.cHandlerRef.unmarshalFactory = b.defaultUnmarshalFactory
 	return b
 }
