@@ -182,7 +182,12 @@ func (b *cHandlerBuilder[T]) AddRequiredPathParam(key string) CHandlerBuilder[T]
 
 func (b *cHandlerBuilder[T]) RequireBody() CHandlerBuilder[T] {
 	b.cHandlerRef.isDataRequired = true
+	b.cHandlerRef.unmarshalFactory = b.defaultUnmarshalFactory
 	return b
+}
+
+func (b *cHandlerBuilder[T]) defaultUnmarshalFactory(data []byte) (T, error) {
+	return utils.UnmarshalJSONEntity[T](data)
 }
 
 func (b *cHandlerBuilder[T]) Unmarshaller(unmarshaller func([]byte) (T, error)) CHandlerBuilder[T] {
