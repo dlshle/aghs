@@ -29,5 +29,7 @@ func CORSAllowWildcardMiddleware(ctx server.MiddlewareContext) {
 	}
 	allowMethodsHeaderValue += "OPTIONS"
 	ctx.Response().SetHeader(HeaderKeyAllowMethods, allowMethodsHeaderValue)
-	ctx.Response().SetCode(http.StatusOK)
+	if ctx.Request().Method() == http.MethodOptions {
+		ctx.Response().SetCode(http.StatusOK)
+	}
 }
