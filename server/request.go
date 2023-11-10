@@ -86,7 +86,7 @@ func (r *request) String() string {
 		r.RemoteAddress(),
 		r.Header(),
 		r.Context(),
-		r.tryGetBody(),
+		truncateString(r.tryGetBody(), 64),
 	)
 }
 
@@ -168,4 +168,11 @@ func (r *request) UnRegisterContext(key string) bool {
 
 func (r *request) Context() RequestContext {
 	return r.c
+}
+
+func truncateString(s string, l int) string {
+	if len(s) <= l {
+		return s
+	}
+	return s[0:l]
 }
