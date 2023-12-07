@@ -1,11 +1,12 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
 
-	"github.com/dlshle/gommon/logger"
+	"github.com/dlshle/gommon/logging"
 	"github.com/dlshle/gommon/uri_trie"
 )
 
@@ -14,18 +15,19 @@ type Server interface {
 }
 
 type immutableServer struct {
+	ctx                   context.Context
 	engine                Engine
 	addr                  string
 	uriTrie               *uri_trie.TrieTree
 	middlewares           []Middleware
-	logger                logger.Logger
+	logger                logging.Logger
 	attachContextForError bool
 }
 
 func (s immutableServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	err := s.HandleHTTP(w, req)
 	if err != nil {
-		s.logger.Errorf("server encountered an error while handling request(%s, %s) from %s due to %s", req.Method, req.URL.Path, req.RemoteAddr, err.Error())
+		s.logger.Errorf(s.ctx, "server encountered an error while handling request(%s, %s) from %s due to %s", req.Method, req.URL.Path, req.RemoteAddr, err.Error())
 	}
 }
 
@@ -44,7 +46,7 @@ func (s immutableServer) HandleHTTP(w http.ResponseWriter, req *http.Request) (e
 	}
 	serverRequest := s.buildRequest(req, matchCtx)
 	traceID := serverRequest.Id()
-	s.logger.Infof("[%s] receive request %s", traceID, serverRequest.String())
+	s.logger.Debugf(s.ctx, "[%s] receive request %s", traceID, serverRequest.String())
 	middlewares := append(s.middlewares, wrapHandlerAsMiddleware(matchCtx.Value.(Service).Handle))
 	resp, serviceErr := runMiddlewares(middlewares, serverRequest)
 	defer func() {
@@ -109,10 +111,10 @@ func (s immutableServer) respondWithServiceResponse(w http.ResponseWriter, r Res
 
 func (s immutableServer) Start() error {
 	addr := s.addr
-	s.logger.Infof("starting the server on %s with TCP protocol...", addr)
+	s.logger.Infof(s.ctx, "starting the server on %s with TCP protocol...", addr)
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
-		s.logger.Errorf("error starting server at addr %s: %s", addr, err.Error())
+		s.logger.Errorf(s.ctx, "error starting server at addr %s: %s", addr, err.Error())
 		return err
 	}
 	return s.startEngine(listener)
@@ -124,25 +126,32 @@ func (s immutableServer) startEngine(listener net.Listener) error {
 
 type Builder interface {
 	Engine(engine Engine) Builder
+	Context(context.Context) Builder
 	Address(string) Builder
 	WithServices([]Service) Builder
 	WithService(Service) Builder
 	WithMiddlewares([]Middleware) Builder
 	WithMiddleware(Middleware) Builder
-	Logger(logger.Logger) Builder
+	Logger(logging.Logger) Builder
 	AttachContextForError(bool) Builder
 	Build() (Server, error)
 }
 
 type serverBuilder struct {
+	ctx                   context.Context
 	engine                Engine
 	addr                  string
 	uriTrie               *uri_trie.TrieTree
 	middlewares           []Middleware
-	logger                logger.Logger
+	logger                logging.Logger
 	attachContextForError bool
 	serviceIdSet          map[string]bool
 	err                   error
+}
+
+func (s *serverBuilder) Context(ctx context.Context) Builder {
+	s.ctx = ctx
+	return s
 }
 
 func (s *serverBuilder) Engine(engine Engine) Builder {
@@ -179,7 +188,7 @@ func (s *serverBuilder) WithMiddleware(middleware Middleware) Builder {
 	return s
 }
 
-func (s *serverBuilder) Logger(l logger.Logger) Builder {
+func (s *serverBuilder) Logger(l logging.Logger) Builder {
 	s.logger = l
 	return s
 }
@@ -194,6 +203,7 @@ func (s *serverBuilder) Build() (Server, error) {
 		return nil, s.err
 	}
 	return immutableServer{
+		ctx:                   s.ctx,
 		engine:                s.engine,
 		addr:                  s.addr,
 		uriTrie:               s.uriTrie,
@@ -212,7 +222,7 @@ func (s *serverBuilder) addService(service Service) bool {
 	for _, pattern := range service.UriPatterns() {
 		err := s.uriTrie.Add(pattern, service, true)
 		if err != nil {
-			s.logger.Errorf("error while adding route %s from service %s: %s", pattern, service.Id(), err.Error())
+			s.logger.Errorf(context.Background(), "error while adding route %s from service %s: %s", pattern, service.Id(), err.Error())
 			s.err = err
 			return false
 		}
@@ -222,10 +232,11 @@ func (s *serverBuilder) addService(service Service) bool {
 
 func NewBuilder() Builder {
 	return &serverBuilder{
+		ctx:          context.Background(),
 		middlewares:  make([]Middleware, 0),
 		serviceIdSet: make(map[string]bool),
 		uriTrie:      uri_trie.NewTrieTree(),
-		logger:       logger.GlobalLogger.WithPrefix("[HTTPServer]"),
+		logger:       logging.GlobalLogger.WithPrefix("[HTTPServer]"),
 		engine:       NetEngine,
 	}
 }

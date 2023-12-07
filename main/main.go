@@ -6,11 +6,13 @@ import (
 
 	"github.com/dlshle/aghs/contrib/middlewares"
 	"github.com/dlshle/aghs/server"
+	"github.com/dlshle/gommon/logging"
 )
 
 func main() {
 	var requestCounter uint32 = 0
 	httpServer, err := server.NewBuilder().
+		Logger(logging.GlobalLogger.WithWaterMark(logging.INFO)).
 		Engine(server.NetEngine).
 		Address("0.0.0.0:1234").
 		WithService(NewStudentService()).

@@ -1,10 +1,11 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
-	"github.com/dlshle/gommon/logger"
+	"github.com/dlshle/gommon/logging"
 )
 
 type MutableService interface {
@@ -16,20 +17,22 @@ type MutableService interface {
 }
 
 type service struct {
+	ctx         context.Context
 	id          string
 	uriMap      map[string]map[string][]Middleware
 	lock        *sync.RWMutex
-	logger      logger.Logger
+	logger      logging.Logger
 	middlewares []Middleware
 }
 
-func NewService(id string) MutableService {
+func NewService(ctx context.Context, id string) MutableService {
 	return service{
+		ctx:         ctx,
 		id:          id,
 		uriMap:      make(map[string]map[string][]Middleware),
 		lock:        new(sync.RWMutex),
 		middlewares: make([]Middleware, 0),
-		logger:      logger.GlobalLogger.WithPrefix("[service-" + id + "]"),
+		logger:      logging.GlobalLogger.WithPrefix("[service-" + id + "]"),
 	}
 }
 
@@ -65,7 +68,7 @@ func (s service) RegisterHandler(method, routePattern string, handler RequestHan
 			s.uriMap[routePattern][method] = []Middleware{wrapHandlerAsMiddleware(handler)}
 		}
 	})
-	s.logger.Infof("handler (%s, %s) has been registered", method, routePattern)
+	s.logger.Infof(s.ctx, "handler (%s, %s) has been registered", method, routePattern)
 	return
 }
 
@@ -138,7 +141,7 @@ func (s service) Use(middleware Middleware) {
 	})
 }
 
-func (s service) Logger() logger.Logger {
+func (s service) Logger() logging.Logger {
 	return s.logger
 }
 

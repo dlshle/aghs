@@ -1,12 +1,14 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log"
 	"os"
 
 	"github.com/dlshle/gommon/logger"
+	"github.com/dlshle/gommon/logging"
 )
 
 type Service interface {
@@ -16,13 +18,14 @@ type Service interface {
 	SupportsRoutePattern(routePattern string) bool
 	SupportsMethodForPattern(routePattern, method string) bool
 	SupportedMethodsForPattern(pattern string) []string
-	Logger() logger.Logger
+	Logger() logging.Logger
 }
 
 type immutableService struct {
+	ctx         context.Context
 	id          string
 	uriMap      map[string]map[string]RequestHandler
-	logger      logger.Logger
+	logger      logging.Logger
 	middlewares []Middleware
 }
 
@@ -74,12 +77,13 @@ func (s immutableService) SupportedMethodsForPattern(pattern string) []string {
 	return supportedMethods
 }
 
-func (s immutableService) Logger() logger.Logger {
+func (s immutableService) Logger() logging.Logger {
 	return s.logger
 }
 
 type ServiceBuilder interface {
 	Id(string) ServiceBuilder
+	Context(context.Context) ServiceBuilder
 	Middlewares(...Middleware) ServiceBuilder
 	WithRouteHandlers(path HandlersWithPath) ServiceBuilder
 	LogWriter(io.Writer) ServiceBuilder
@@ -87,6 +91,7 @@ type ServiceBuilder interface {
 }
 
 type immutableServiceBuilder struct {
+	ctx         context.Context
 	s           *immutableService
 	uriMap      map[string]map[string][]Middleware
 	middlewares []Middleware
@@ -97,6 +102,7 @@ type immutableServiceBuilder struct {
 func NewServiceBuilder() ServiceBuilder {
 	return &immutableServiceBuilder{
 		s: &immutableService{
+			ctx:         context.Background(),
 			uriMap:      make(map[string]map[string]RequestHandler),
 			middlewares: make([]Middleware, 0),
 		},
@@ -105,6 +111,11 @@ func NewServiceBuilder() ServiceBuilder {
 		err:         nil,
 		writer:      nil,
 	}
+}
+
+func (b *immutableServiceBuilder) Context(ctx context.Context) ServiceBuilder {
+	b.s.ctx = ctx
+	return b
 }
 
 func (b *immutableServiceBuilder) Middlewares(middlewares ...Middleware) ServiceBuilder {
@@ -173,13 +184,13 @@ func (b *immutableServiceBuilder) Id(id string) ServiceBuilder {
 	} else {
 		writer = os.Stdout
 	}
-	b.s.logger = logger.NewLevelLogger(writer, fmt.Sprintf("[service-%s]", id), log.Ldate|log.Ltime, logger.TRACE)
+	b.s.logger = logging.NewLevelLogger(writer, fmt.Sprintf("[service-%s]", id), log.Ldate|log.Ltime, logger.TRACE)
 	return b
 }
 
 func (b *immutableServiceBuilder) LogWriter(writer io.Writer) ServiceBuilder {
 	if b.s.id != "" {
-		b.s.logger = logger.GlobalLogger.WithPrefix("[service-" + b.s.id + "]")
+		b.s.logger = logging.GlobalLogger.WithPrefix("[service-" + b.s.id + "]")
 	}
 	b.writer = writer
 	return b

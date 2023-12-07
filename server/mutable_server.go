@@ -1,32 +1,35 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
 
-	"github.com/dlshle/gommon/logger"
+	"github.com/dlshle/gommon/logging"
 	"github.com/dlshle/gommon/uri_trie"
 	"github.com/valyala/fasthttp"
 	"github.com/valyala/fasthttp/fasthttpadaptor"
 )
 
 type HTTPServer struct {
+	ctx                   context.Context
 	addr                  string
 	uriTrie               *uri_trie.TrieTree // trie of <routePattern, RequestHandler>
 	services              map[string]Service
 	middlewareManager     MiddlewareManager
-	logger                logger.Logger
+	logger                logging.Logger
 	attachContextForError bool
 }
 
-func NewHTTPServer(addr string) HTTPServer {
+func NewHTTPServer(ctx context.Context, addr string) HTTPServer {
 	return HTTPServer{
+		ctx:                   ctx,
 		addr:                  addr,
 		uriTrie:               uri_trie.NewTrieTree(),
 		services:              make(map[string]Service),
 		middlewareManager:     NewMiddlewareManager(),
-		logger:                logger.GlobalLogger.WithPrefix("[HTTPServer]"),
+		logger:                logging.GlobalLogger.WithPrefix("[HTTPServer]"),
 		attachContextForError: false,
 	}
 }
@@ -53,18 +56,18 @@ func (s HTTPServer) RegisterService(service Service) error {
 	for _, pattern := range service.UriPatterns() {
 		err := s.uriTrie.Add(pattern, service, true)
 		if err != nil {
-			s.logger.Errorf("error while adding route %s from service %s: %s", pattern, service.Id(), err.Error())
+			s.logger.Errorf(s.ctx, "error while adding route %s from service %s: %s", pattern, service.Id(), err.Error())
 			return err
 		}
 	}
-	s.logger.Infof("service %s has been registered", service.Id())
+	s.logger.Infof(s.ctx, "service %s has been registered", service.Id())
 	return nil
 }
 
 func (s HTTPServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	err := s.HandleHTTP(w, req)
 	if err != nil {
-		s.logger.Errorf("server encountered an error while handling request(%s, %s) from %s due to %s", req.Method, req.URL.Path, req.RemoteAddr, err.Error())
+		s.logger.Errorf(s.ctx, "server encountered an error while handling request(%s, %s) from %s due to %s", req.Method, req.URL.Path, req.RemoteAddr, err.Error())
 	}
 }
 
@@ -83,7 +86,7 @@ func (s HTTPServer) HandleHTTP(w http.ResponseWriter, req *http.Request) (err er
 	}
 	serverRequest := s.buildRequest(req, matchCtx)
 	traceID := serverRequest.Id()
-	s.logger.Infof("[%s] receive request %s", traceID, serverRequest.String())
+	s.logger.Debugf(s.ctx, "[%s] receive request %s", traceID, serverRequest.String())
 	middlewareCtx := s.middlewareManager.Run(serverRequest, matchCtx.Value.(Service).Handle)
 	resp, serviceErr := middlewareCtx.Response(), middlewareCtx.Error()
 	defer func() {
@@ -142,10 +145,10 @@ func (s HTTPServer) respondWithServiceResponse(w http.ResponseWriter, r Response
 
 func (s HTTPServer) Start() error {
 	addr := s.addr
-	s.logger.Infof("starting the server on %s with TCP protocol...", addr)
+	s.logger.Infof(s.ctx, "starting the server on %s with TCP protocol...", addr)
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
-		s.logger.Errorf("error starting server at addr %s: %s", addr, err.Error())
+		s.logger.Errorf(s.ctx, "error starting server at addr %s: %s", addr, err.Error())
 		return err
 	}
 	return fasthttp.Serve(listener, fasthttpadaptor.NewFastHTTPHandler(s))
