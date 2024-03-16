@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dlshle/gommon/ctimer"
+	"github.com/dlshle/gommon/timer"
 )
 
 const (
@@ -63,14 +63,14 @@ type Controller interface {
 
 type controller struct {
 	windowMap     *sync.Map
-	cleanJobTimer ctimer.CTimer
+	cleanJobTimer timer.Timer
 }
 
 func NewThrottleController() Controller {
 	controller := &controller{
 		windowMap: new(sync.Map),
 	}
-	cleanJobTimer := ctimer.New(RecordCleanJobInterval, controller.cleanJob)
+	cleanJobTimer := timer.New(RecordCleanJobInterval, controller.cleanJob)
 	controller.cleanJobTimer = cleanJobTimer
 	cleanJobTimer.Repeat()
 	return controller

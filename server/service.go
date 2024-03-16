@@ -7,7 +7,6 @@ import (
 	"log"
 	"os"
 
-	"github.com/dlshle/gommon/logger"
 	"github.com/dlshle/gommon/logging"
 )
 
@@ -184,7 +183,7 @@ func (b *immutableServiceBuilder) Id(id string) ServiceBuilder {
 	} else {
 		writer = os.Stdout
 	}
-	b.s.logger = logging.NewLevelLogger(writer, fmt.Sprintf("[service-%s]", id), log.Ldate|log.Ltime, logger.TRACE)
+	b.s.logger = logging.NewLevelLogger(writer, fmt.Sprintf("[service-%s]", id), log.Ldate|log.Ltime, logging.TRACE)
 	return b
 }
 

@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"sync"
-
-	"github.com/dlshle/gommon/stringz"
 )
 
 var responsePool sync.Pool = sync.Pool{New: func() any {
@@ -97,11 +95,7 @@ func (r *response) PayloadStream() (stream []byte, err error) {
 	case string:
 		stream = []byte(r.payload.(string))
 	default:
-		if transformed, ok := r.payload.(stringz.Stringify); ok {
-			stream = []byte(transformed.String())
-		} else {
-			stream, err = json.Marshal(r.Payload())
-		}
+		stream, err = json.Marshal(r.Payload())
 	}
 	return
 }
