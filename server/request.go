@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -44,6 +45,7 @@ type Request interface {
 	RegisterContext(key string, value interface{})
 	UnRegisterContext(key string) bool
 	Context() RequestContext
+	RawCtx() context.Context
 }
 
 type request struct {
@@ -168,6 +170,10 @@ func (r *request) UnRegisterContext(key string) bool {
 
 func (r *request) Context() RequestContext {
 	return r.c
+}
+
+func (r *request) RawCtx() context.Context {
+	return r.r.Context()
 }
 
 func truncateString(s string, l int) string {

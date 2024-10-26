@@ -21,11 +21,13 @@ type Service interface {
 }
 
 type immutableService struct {
-	ctx         context.Context
-	id          string
-	uriMap      map[string]map[string]RequestHandler
-	logger      logging.Logger
-	middlewares []Middleware
+	ctx                context.Context
+	id                 string
+	uriMap             map[string]map[string]RequestHandler
+	asyncHandlerUriMap map[string]map[string]Middleware
+	isAsync            bool
+	logger             logging.Logger
+	middlewares        []Middleware
 }
 
 func (s immutableService) getRequestHandlingMiddlewares(routePattern, method string) RequestHandler {
@@ -101,9 +103,11 @@ type immutableServiceBuilder struct {
 func NewServiceBuilder() ServiceBuilder {
 	return &immutableServiceBuilder{
 		s: &immutableService{
-			ctx:         context.Background(),
-			uriMap:      make(map[string]map[string]RequestHandler),
-			middlewares: make([]Middleware, 0),
+			ctx:                context.Background(),
+			uriMap:             make(map[string]map[string]RequestHandler),
+			middlewares:        make([]Middleware, 0),
+			asyncHandlerUriMap: make(map[string]map[string]Middleware),
+			isAsync:            false,
 		},
 		uriMap:      make(map[string]map[string][]Middleware),
 		middlewares: make([]Middleware, 0),
