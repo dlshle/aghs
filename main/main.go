@@ -11,7 +11,7 @@ import (
 
 func main() {
 	var requestCounter uint32 = 0
-	httpServer, err := server.NewBuilder().
+	httpServer := server.NewBuilder().
 		Logger(logging.GlobalLogger.WithWaterMark(logging.INFO)).
 		Engine(server.NetEngine).
 		Address("0.0.0.0:1234").
@@ -23,9 +23,6 @@ func main() {
 				ctx.Response().SetHeader("total-request-count", strconv.Itoa(int(atomic.LoadUint32(&requestCounter))))
 			}()
 			ctx.Next()
-		}).Build()
-	if err != nil {
-		panic(err)
-	}
+		}).MustBuild()
 	httpServer.Start()
 }

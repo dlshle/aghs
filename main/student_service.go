@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/dlshle/aghs/server"
@@ -20,6 +21,7 @@ const (
 	routeStudentByID  = "/students/:sid"
 	routeStudentLogin = "/students/login"
 	routeStatus       = "/status"
+	routeFiles        = "/files"
 )
 
 func NewStudentService() StudentService {
@@ -28,7 +30,7 @@ func NewStudentService() StudentService {
 		NewAuthMiddleware(),
 		store.NewInMemoryKVStore(200),
 	}
-	service, _ := server.NewServiceBuilder().
+	service := server.NewServiceBuilder().
 		Id("student").
 		WithRouteHandlers(
 			server.PathHandlerBuilder(routeStudentByID).
@@ -52,7 +54,20 @@ func NewStudentService() StudentService {
 				return server.NewResponse(http.StatusOK, nil)
 			}).MustBuild().HandleRequest).
 			Build()).
-		Build()
+		WithRouteHandlers(server.PathHandlerBuilder(routeFiles).
+			Post(func(r server.Request) (server.Response, server.ServiceError) {
+				file, err := r.FormFile("data", 1024*1024*10)
+				if err != nil {
+					return nil, server.InternalError(err.Error())
+				}
+				data, err := io.ReadAll(file)
+				if err != nil {
+					return nil, server.InternalError(err.Error())
+				}
+				fmt.Printf("data: %v\n", data[:50])
+				return server.NewResponse(200, "ok"), nil
+			}).Build()).
+		MustBuild()
 	studentService.Service = service
 	return studentService
 }
