@@ -45,8 +45,6 @@ func (s immutableServer) HandleHTTP(w http.ResponseWriter, req *http.Request) (e
 		return s.respondWithError(w, NotFoundError(fmt.Sprintf("route %s is undefined", uri)), nil, nil)
 	}
 	serverRequest := s.buildRequest(req, matchCtx)
-	traceID := serverRequest.Id()
-	s.logger.Debugf(s.ctx, "[%s] receive request %s", traceID, serverRequest.String())
 	middlewares := append(s.middlewares, wrapHandlerAsMiddleware(matchCtx.Value.(Service).Handle))
 	resp, serviceErr := runMiddlewares(middlewares, serverRequest)
 	defer func() {
@@ -135,6 +133,7 @@ type Builder interface {
 	Logger(logging.Logger) Builder
 	AttachContextForError(bool) Builder
 	Build() (Server, error)
+	MustBuild() Server
 }
 
 type serverBuilder struct {
@@ -211,6 +210,14 @@ func (s *serverBuilder) Build() (Server, error) {
 		logger:                s.logger,
 		attachContextForError: s.attachContextForError,
 	}, nil
+}
+
+func (s *serverBuilder) MustBuild() Server {
+	svr, err := s.Build()
+	if err != nil {
+		panic(err)
+	}
+	return svr
 }
 
 func (s *serverBuilder) addService(service Service) bool {

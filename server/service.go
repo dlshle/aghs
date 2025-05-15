@@ -89,6 +89,7 @@ type ServiceBuilder interface {
 	WithRouteHandlers(path HandlersWithPath) ServiceBuilder
 	LogWriter(io.Writer) ServiceBuilder
 	Build() (Service, error)
+	MustBuild() Service
 }
 
 type immutableServiceBuilder struct {
@@ -156,6 +157,14 @@ func (b *immutableServiceBuilder) Build() (Service, error) {
 	b.tryConcatServiceMiddlewaresToRequestHandlerMiddlewares()
 	b.compressRequestHandlerMiddlewares()
 	return b.s, nil
+}
+
+func (b *immutableServiceBuilder) MustBuild() Service {
+	svc, err := b.Build()
+	if err != nil {
+		panic(err)
+	}
+	return svc
 }
 
 func (b *immutableServiceBuilder) tryConcatServiceMiddlewaresToRequestHandlerMiddlewares() {

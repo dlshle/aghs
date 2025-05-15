@@ -1,6 +1,7 @@
 package server
 
 import (
+	"io"
 	"strings"
 
 	"github.com/dlshle/gommon/errors"
@@ -18,6 +19,9 @@ type CHandle[T any] interface {
 	PathParam(string) string
 	Header(string) string
 	Request() Request
+	FormFile(key string, maxSize int64) (io.ReadCloser, error)
+	MultipartFormValue(key string, maxSize int64) ([]string, error)
+	FormValue(key string) (string, error)
 }
 
 type cHandle[T any] struct {
@@ -50,9 +54,22 @@ func (h cHandle[T]) Request() Request {
 	return h.request
 }
 
+func (h cHandle[T]) FormFile(key string, maxSize int64) (io.ReadCloser, error) {
+	return h.request.FormFile(key, maxSize)
+}
+
+func (h cHandle[T]) MultipartFormValue(key string, maxSize int64) ([]string, error) {
+	return h.request.MultipartFormValue(key, maxSize)
+}
+
+func (h cHandle[T]) FormValue(key string) (string, error) {
+	return h.request.FormValue(key)
+}
+
 type cHandler[T any] struct {
 	unmarshalFactory       func([]byte) (T, error)
 	isDataRequired         bool
+	isFormDataRequired     bool
 	requiredPathParams     map[string]bool
 	requiredQueryParams    map[string]bool
 	requiredHeaderFields   map[string]bool
@@ -119,6 +136,9 @@ func (h cHandler[T]) checkRequiredQueryParams(request Request) error {
 
 func (h cHandler[T]) getAndCheckData(request Request) (T, error) {
 	var zeroVal T
+	if !h.isDataRequired {
+		return zeroVal, nil
+	}
 	data, err := request.Body()
 	if err != nil {
 		return zeroVal, err
@@ -144,6 +164,7 @@ type CHandlerBuilder[T any] interface {
 	AddRequiredPathParam(key string) CHandlerBuilder[T]
 	AddRequiredHeaderField(key string) CHandlerBuilder[T]
 	RequireBody() CHandlerBuilder[T]
+	RequireFormData() CHandlerBuilder[T]
 	Unmarshaller(func([]byte) (T, error)) CHandlerBuilder[T]
 	UseDefaultUnmarshaller() CHandlerBuilder[T]
 	ErrorHandler(func(error) interface{}) CHandlerBuilder[T]
@@ -183,6 +204,11 @@ func (b *cHandlerBuilder[T]) AddRequiredPathParam(key string) CHandlerBuilder[T]
 
 func (b *cHandlerBuilder[T]) RequireBody() CHandlerBuilder[T] {
 	b.cHandlerRef.isDataRequired = true
+	return b
+}
+
+func (b *cHandlerBuilder[T]) RequireFormData() CHandlerBuilder[T] {
+	b.cHandlerRef.isFormDataRequired = true
 	return b
 }
 

@@ -15,21 +15,33 @@ const (
 
 func CORSAllowWildcardMiddleware(ctx server.MiddlewareContext) {
 	ctx.Next()
-	ctx.Response().SetHeader(HeaderKeyAllowOrigin, "*")
-	ctx.Response().SetHeader(HeaderKeyAllowHeaders, "*")
-	ctx.Response().SetHeader(HeaderKeyVary, "Origin")
-	allowMethods := ctx.Request().MatchedService().SupportedMethodsForPattern(ctx.Request().UriPattern())
-	allowMethodsHeaderValue := ""
-	for _, method := range allowMethods {
-		if method == "OPTIONS" {
-			continue
-		}
-		allowMethodsHeaderValue += method + ", "
+	// if no origin is present in the header, skip
+	origin := ctx.Request().Header().Get("Origin")
+	if origin == "" {
+		return
 	}
-	allowMethodsHeaderValue += "OPTIONS"
-	ctx.Response().SetHeader(HeaderKeyAllowMethods, allowMethodsHeaderValue)
+
+	// allow all for now
+	ctx.Response().SetHeader(HeaderKeyAllowOrigin, origin)
+	ctx.Response().SetHeader(HeaderKeyVary, "Origin")
+
 	if ctx.Request().Method() == http.MethodOptions {
+		// allow headers
+		requestedHdrs := ctx.Request().Header().Get("Access-Control-Request-Headers")
+		ctx.Response().SetHeader(HeaderKeyAllowHeaders, requestedHdrs)
+
+		// allow methods
+		allowMethods := ctx.Request().MatchedService().SupportedMethodsForPattern(ctx.Request().UriPattern())
+		allowMethodsHeaderValue := ""
+		for _, method := range allowMethods {
+			if method == "OPTIONS" {
+				continue
+			}
+			allowMethodsHeaderValue += method + ", "
+		}
+		allowMethodsHeaderValue += "OPTIONS"
+		ctx.Response().SetHeader(HeaderKeyAllowMethods, allowMethodsHeaderValue)
 		ctx.Report(nil)
-		ctx.Response().SetCode(http.StatusOK)
+		ctx.Response().SetCode(http.StatusNoContent)
 	}
 }

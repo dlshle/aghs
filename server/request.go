@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"sync"
 
@@ -39,6 +39,9 @@ type Request interface {
 	Method() string
 	Header() http.Header
 	Body() ([]byte, error)
+	FormFile(key string, maxSize int64) (io.ReadCloser, error)
+	MultipartFormValue(key string, maxSize int64) ([]string, error)
+	FormValue(key string) (string, error)
 	UnmarshalBody(holder interface{}) error
 	RemoteAddress() string
 	GetContext(key string) interface{}
@@ -135,13 +138,40 @@ func (r *request) Header() http.Header {
 
 func (r *request) Body() ([]byte, error) {
 	if r.body == nil {
-		bodyBytes, err := ioutil.ReadAll(r.r.Body)
+		bodyBytes, err := io.ReadAll(r.r.Body)
 		if err != nil {
 			return nil, err
 		}
 		r.body = bodyBytes
 	}
 	return r.body, nil
+}
+
+func (r *request) FormFile(key string, maxSize int64) (io.ReadCloser, error) {
+	if err := r.r.ParseMultipartForm(10 << 20); err != nil {
+		return nil, fmt.Errorf("failed to parse multipart form: %v", err)
+	}
+	file, _, err := r.r.FormFile(key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract multipart form file: %v", err)
+	}
+	return file, nil
+}
+
+func (r *request) FormValue(key string) (string, error) {
+	err := r.r.ParseForm()
+	if err != nil {
+		return "", err
+	}
+	return r.r.FormValue(key), nil
+}
+
+func (r *request) MultipartFormValue(key string, maxSize int64) ([]string, error) {
+	err := r.r.ParseMultipartForm(maxSize)
+	if err != nil {
+		return nil, err
+	}
+	return r.r.MultipartForm.Value[key], nil
 }
 
 func (r *request) UnmarshalBody(holder interface{}) error {
