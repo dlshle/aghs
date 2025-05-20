@@ -136,9 +136,6 @@ func (h cHandler[T]) checkRequiredQueryParams(request Request) error {
 
 func (h cHandler[T]) getAndCheckData(request Request) (T, error) {
 	var zeroVal T
-	if !h.isDataRequired {
-		return zeroVal, nil
-	}
 	data, err := request.Body()
 	if err != nil {
 		return zeroVal, err
@@ -146,7 +143,7 @@ func (h cHandler[T]) getAndCheckData(request Request) (T, error) {
 	if len(data) == 0 && h.isDataRequired {
 		return zeroVal, errors.Error("bad request: request body is missing")
 	}
-	if h.unmarshalFactory != nil {
+	if len(data) > 0 && h.unmarshalFactory != nil {
 		return h.unmarshalFactory(data)
 	}
 	return zeroVal, nil
