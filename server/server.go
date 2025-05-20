@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"runtime/debug"
 
 	"github.com/dlshle/gommon/logging"
 	"github.com/dlshle/gommon/uri_trie"
@@ -36,6 +37,7 @@ func (s immutableServer) HandleHTTP(w http.ResponseWriter, req *http.Request) (e
 		// in case of any panic
 		if recoveredPanic := recover(); recoveredPanic != nil {
 			err = fmt.Errorf("%v", recoveredPanic)
+			debug.PrintStack()
 			s.respondWithError(w, InternalError(err.Error()), nil, nil)
 		}
 	}()

@@ -136,6 +136,9 @@ func (h cHandler[T]) checkRequiredQueryParams(request Request) error {
 
 func (h cHandler[T]) getAndCheckData(request Request) (T, error) {
 	var zeroVal T
+	if h.isFormDataRequired {
+		return zeroVal, nil
+	}
 	data, err := request.Body()
 	if err != nil {
 		return zeroVal, err
@@ -211,6 +214,7 @@ func (b *cHandlerBuilder[T]) RequireFormData() CHandlerBuilder[T] {
 
 func (b *cHandlerBuilder[T]) UseDefaultUnmarshaller() CHandlerBuilder[T] {
 	b.cHandlerRef.unmarshalFactory = b.defaultUnmarshalFactory
+	b.cHandlerRef.isDataRequired = true
 	return b
 }
 
@@ -220,6 +224,7 @@ func (b *cHandlerBuilder[T]) defaultUnmarshalFactory(data []byte) (T, error) {
 
 func (b *cHandlerBuilder[T]) Unmarshaller(unmarshaller func([]byte) (T, error)) CHandlerBuilder[T] {
 	b.cHandlerRef.unmarshalFactory = unmarshaller
+	b.cHandlerRef.isDataRequired = true
 	return b
 }
 
