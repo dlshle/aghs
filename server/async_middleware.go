@@ -55,6 +55,7 @@ func (c *asyncMiddlewareCtx) Error() ServiceError {
 	return c.err
 }
 
+/* fix later
 func runAsyncMiddlewares(middlewares []AsyncMiddleware, request Request) async.Future {
 	ctx := makeAsyncMiddlewareContext(middlewares, request)
 	return ctx.Next().Then(func(i interface{}) interface{} {
@@ -66,6 +67,7 @@ func runAsyncMiddlewares(middlewares []AsyncMiddleware, request Request) async.F
 		ctx.recycle()
 	})
 }
+*/
 
 func makeAsyncMiddlewareContext(middlewares []AsyncMiddleware, request Request) *asyncMiddlewareCtx {
 	response := NewResponse(0, nil)
