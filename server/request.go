@@ -7,28 +7,15 @@ import (
 	"io"
 	"net/http"
 	"sync"
-
-	"github.com/dlshle/aghs/utils"
 )
 
 var (
 	requestPool sync.Pool = sync.Pool{New: func() any {
 		return new(request)
 	}}
-	requestContextPool sync.Pool = sync.Pool{New: func() any {
-		return make(RequestContext)
-	}}
-)
-
-const (
-	ContextKeyUriPattern     = "uri_pattern"
-	ContextKeyQueryParams    = "query_params"
-	ContextKeyPathParams     = "path_params"
-	ContextKeyMatchedService = "matched_service"
 )
 
 type Request interface {
-	Id() string
 	String() string
 	UriPattern() string
 	Path() string
@@ -44,48 +31,46 @@ type Request interface {
 	FormValue(key string) (string, error)
 	UnmarshalBody(holder interface{}) error
 	RemoteAddress() string
-	GetContext(key string) interface{}
-	RegisterContext(key string, value interface{})
-	UnRegisterContext(key string) bool
-	Context() RequestContext
+	GetContext(key string) string
+	RegisterContext(key, value string)
+	Context() context.Context
 	RawCtx() context.Context
 }
 
 type request struct {
-	id   string
-	r    *http.Request
-	c    RequestContext
-	body []byte
+	r           *http.Request
+	c           context.Context
+	uriPattern  string
+	pathParams  map[string]string
+	queryParams map[string]string
+	svc         Service
+	body        []byte
 }
 
 func NewRequest(r *http.Request, matchedSvc Service, uriPattern string, queryParams map[string]string, pathParams map[string]string) Request {
-	c := requestContextPool.Get().(RequestContext)
-	c.RegisterContext(ContextKeyUriPattern, uriPattern)
-	c.RegisterContext(ContextKeyQueryParams, queryParams)
-	c.RegisterContext(ContextKeyPathParams, pathParams)
-	c.RegisterContext(ContextKeyMatchedService, matchedSvc)
 	request := requestPool.Get().(*request)
-	request.id = utils.GenerateID()
+	request.svc = matchedSvc
+	request.uriPattern = uriPattern
+	request.pathParams = pathParams
+	request.queryParams = queryParams
 	request.r = r
-	request.c = c
+	request.c = r.Context()
 	return request
 }
 
 func (r *request) recycle() {
 	r.body = nil
-	r.id = ""
 	r.r = nil
-	requestContextPool.Put(r.c)
+	r.c = nil
+	r.uriPattern = ""
+	r.pathParams = nil
+	r.queryParams = nil
+	r.svc = nil
 	requestPool.Put(r)
 }
 
-func (r *request) Id() string {
-	return r.id
-}
-
 func (r *request) String() string {
-	return fmt.Sprintf(`Request{"id":"%s","method":"%s","url":"%s","remoteAddr":"%s","header":"%s","context":"%s","body":"%s"}`,
-		r.id,
+	return fmt.Sprintf(`Request{"method":"%s","url":"%s","remoteAddr":"%s","header":"%s","context":"%s","body":"%s"}`,
 		r.Method(),
 		r.r.URL.String(),
 		r.RemoteAddress(),
@@ -104,7 +89,7 @@ func (r *request) tryGetBody() string {
 }
 
 func (r *request) UriPattern() string {
-	return r.GetContext(ContextKeyUriPattern).(string)
+	return r.uriPattern
 }
 
 func (r *request) Path() string {
@@ -117,15 +102,15 @@ func (r *request) URI() string {
 }
 
 func (r *request) PathParams() map[string]string {
-	return r.GetContext(ContextKeyPathParams).(map[string]string)
+	return r.pathParams
 }
 
 func (r *request) QueryParams() map[string]string {
-	return r.GetContext(ContextKeyQueryParams).(map[string]string)
+	return r.queryParams
 }
 
 func (r *request) MatchedService() Service {
-	return r.GetContext(ContextKeyMatchedService).(Service)
+	return r.svc
 }
 
 func (r *request) Method() string {
@@ -186,19 +171,15 @@ func (r *request) RemoteAddress() string {
 	return r.r.RemoteAddr
 }
 
-func (r *request) GetContext(key string) interface{} {
-	return r.c.GetContext(key)
+func (r *request) GetContext(key string) string {
+	return r.c.Value(key).(string)
 }
 
-func (r *request) RegisterContext(key string, value interface{}) {
-	r.c.RegisterContext(key, value)
+func (r *request) RegisterContext(key, value string) {
+	r.c = context.WithValue(r.c, key, value)
 }
 
-func (r *request) UnRegisterContext(key string) bool {
-	return r.c.UnRegisterContext(key)
-}
-
-func (r *request) Context() RequestContext {
+func (r *request) Context() context.Context {
 	return r.c
 }
 

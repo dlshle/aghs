@@ -110,11 +110,7 @@ func (s StudentService) handleAddStudent(r server.Request) (server.Response, ser
 }
 
 func (s StudentService) handleUpdateStudent(r server.Request) (server.Response, server.ServiceError) {
-	c_sid := r.GetContext(STUDENT_ID_CONTEXT_KEY)
-	sid, ok := c_sid.(string)
-	if !ok {
-		return nil, server.InternalError("unable to get student id from request context")
-	}
+	sid := r.GetContext(STUDENT_ID_CONTEXT_KEY)
 	toUpdateStudentId := r.PathParams()["sid"]
 	if toUpdateStudentId == "" {
 		return nil, server.BadRequestError("invalid student id in path param")

@@ -72,7 +72,7 @@ func (s immutableServer) buildRequest(r *http.Request, matchCtx *uri_trie.MatchC
 	return NewRequest(r, matchCtx.Value.(Service), matchCtx.UriPattern, matchCtx.QueryParams, matchCtx.PathParams)
 }
 
-func (s immutableServer) respondWithError(w http.ResponseWriter, serviceErr ServiceError, resp Response, requestCtx RequestContext) (err error) {
+func (s immutableServer) respondWithError(w http.ResponseWriter, serviceErr ServiceError, resp Response, requestCtx context.Context) (err error) {
 	if s.attachContextForError {
 		serviceErr.AttachContext(requestCtx)
 	}

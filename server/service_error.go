@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -12,13 +13,13 @@ type ServiceError interface {
 	Error() string
 	Code() int
 	ContentType() string
-	AttachContext(ctx RequestContext)
+	AttachContext(ctx context.Context)
 }
 
 type serviceError struct {
 	code int    // code should correspond to an HTTP error code
 	msg  string // this will be the payload for response
-	ctx  RequestContext
+	ctx  context.Context
 }
 
 func NewServiceErrorWithCode(code int, msg string) *serviceError {
@@ -44,18 +45,6 @@ func (e *serviceError) errorWithContext() string {
 	var builder strings.Builder
 	builder.WriteByte('{')
 	builder.WriteString(fmt.Sprintf(`"message":"%s"`, utils.EncodeString(e.msg)))
-	if e.ctx != nil {
-		builder.WriteByte(',')
-		l := len(e.ctx)
-		count := 0
-		for k, v := range e.ctx {
-			builder.WriteString(fmt.Sprintf(`"%s":"%s"`, k, v))
-			if count < l {
-				builder.WriteByte(',')
-			}
-			count++
-		}
-	}
 	builder.WriteByte('}')
 	return builder.String()
 }
@@ -71,7 +60,7 @@ func (e *serviceError) Code() int {
 	return e.code
 }
 
-func (e *serviceError) AttachContext(ctx RequestContext) {
+func (e *serviceError) AttachContext(ctx context.Context) {
 	e.ctx = ctx
 }
 

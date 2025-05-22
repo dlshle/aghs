@@ -47,7 +47,7 @@ func (m authMiddleware) authorize(r server.Request) (server.Request, server.Serv
 	if err != nil {
 		return r, server.ForbiddenError(err.Error())
 	}
-	r.Context().RegisterContext(STUDENT_ID_CONTEXT_KEY, studentId)
+	r.RegisterContext(STUDENT_ID_CONTEXT_KEY, studentId)
 	return r, nil
 }
 
