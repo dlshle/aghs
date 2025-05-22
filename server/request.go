@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"sync"
+
+	"github.com/dlshle/gommon/logging"
 )
 
 var (
@@ -176,7 +178,7 @@ func (r *request) GetContext(key string) string {
 }
 
 func (r *request) RegisterContext(key, value string) {
-	r.c = context.WithValue(r.c, key, value)
+	r.c = logging.WrapCtx(r.c, key, value)
 }
 
 func (r *request) Context() context.Context {
