@@ -32,6 +32,10 @@ func newMiddlewareContext(request Request, response Response) *middlewareContext
 }
 
 func (c *middlewareContext) recycle() {
+	c.request = nil
+	c.response = nil
+	c.next = nil
+	c.err = nil
 	middlewareContextPool.Put(c)
 }
 
